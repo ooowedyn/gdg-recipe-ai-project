@@ -1,0 +1,9 @@
+{
+  "imageFileName": "sample-ingredients.jpg",
+  "description": "식재료가 포함된 사진 입력 예시",
+  "userOptions": {
+    "mealType": null,
+    "difficulty": null,
+    "maxCookingTime": null
+  }
+}

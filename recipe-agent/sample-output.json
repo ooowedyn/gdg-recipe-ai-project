@@ -1,0 +1,26 @@
+{
+  "recipes": [
+    {
+      "title": "대파계란덮밥",
+      "usedIngredients": ["계란", "대파"],
+      "time": "10분",
+      "difficulty": "쉬움",
+      "reason": "현재 가진 재료만으로 간단하게 만들 수 있고 조리 시간이 짧습니다."
+    },
+    {
+      "title": "계란국",
+      "usedIngredients": ["계란", "대파"],
+      "time": "15분",
+      "difficulty": "쉬움",
+      "reason": "기본 재료만으로 만들 수 있는 간단한 국물 요리입니다."
+    },
+    {
+      "title": "양파계란볶음",
+      "usedIngredients": ["계란", "양파"],
+      "time": "10분",
+      "difficulty": "쉬움",
+      "reason": "계란과 양파만으로 빠르게 만들 수 있는 반찬입니다."
+    }
+  ]
+}
+

@@ -1,0 +1,15 @@
+.env
+.env.local
+
+node_modules/
+.venv/
+__pycache__/
+
+dist/
+build/
+
+*.log
+*.zip
+*.pt
+*.pth
+*.onnx
