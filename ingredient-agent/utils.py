@@ -1,0 +1,5 @@
+import base64
+
+def load_image_as_base64(file_path: str) -> str:
+    with open(file_path, "rb") as f:
+        return base64.b64encode(f.read()).decode("utf-8")
