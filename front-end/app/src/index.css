@@ -1,0 +1,317 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+
+:root {
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  
+  /* Color Palette: Cream, Soft Yellow, & Rich Browns */
+  --bg-desktop: #F5EFEB; /* Very soft warm beige for the overall page background */
+  --bg-app: #FAF6EE;     /* Warm cream for the mobile screen */
+  --bg-card: #FFFFFF;
+  
+  --color-primary: #513629;      /* Dark chocolate brown */
+  --color-primary-light: #735445; /* Soft cocoa brown */
+  --color-primary-rgb: 81, 54, 41;
+  
+  --color-accent: #F8B62D;       /* Sunny warm yellow */
+  --color-accent-hover: #E29E1B;
+  --color-accent-light: #FFF8E7; /* Soft yellow highlight tint */
+  --color-accent-rgb: 248, 182, 45;
+  
+  --color-text-main: #2F1E16;    /* Dark espresso brown for main headers */
+  --color-text-muted: #7C675C;   /* Hazel brown for body text */
+  --color-border: #EFECE6;       /* Clean warm border line */
+  
+  --color-danger: #D94B48;
+  --color-danger-light: #FDF2F2;
+  --color-success: #34A853;
+  --color-success-light: #EBF7EE;
+  
+  --shadow-sm: 0 2px 8px rgba(81, 54, 41, 0.05);
+  --shadow-md: 0 8px 24px rgba(81, 54, 41, 0.08);
+  --shadow-lg: 0 16px 40px rgba(81, 54, 41, 0.12);
+  --shadow-smartphone: 0 30px 70px -10px rgba(50, 30, 20, 0.3);
+  
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-xl: 40px;
+  
+  --transition-fast: 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-normal: 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Reset and Globals */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background-color: var(--bg-desktop);
+  color: var(--color-text-main);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Desktop App Container */
+.yumpick-app-shell {
+  display: flex;
+  min-height: 100vh;
+  width: 100vw;
+  align-items: stretch;
+}
+
+/* Left Panel - Developer & Designer Showcase Info */
+.desktop-info-panel {
+  flex: 1;
+  background-color: var(--color-primary);
+  color: #FFF;
+  padding: 60px 50px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  max-width: 550px;
+  border-right: 8px solid var(--color-accent);
+}
+
+@media (max-width: 1024px) {
+  .desktop-info-panel {
+    display: none; /* Hide on smaller screens to focus on the mobile app simulator */
+  }
+}
+
+.info-badge {
+  background-color: var(--color-accent);
+  color: var(--color-primary);
+  font-weight: 800;
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 30px;
+  align-self: flex-start;
+  letter-spacing: 1px;
+  margin-bottom: 20px;
+}
+
+.panel-title {
+  font-size: 48px;
+  font-weight: 800;
+  letter-spacing: -1.5px;
+  margin-bottom: 10px;
+  color: #FFF;
+}
+
+.panel-subtitle {
+  font-size: 18px;
+  color: var(--color-accent-light);
+  opacity: 0.9;
+  margin-bottom: 40px;
+}
+
+.spec-card {
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 24px;
+  border-radius: var(--radius-md);
+  margin-bottom: 24px;
+  backdrop-filter: blur(10px);
+}
+
+.spec-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-accent);
+  margin-bottom: 12px;
+}
+
+.spec-list {
+  list-style: none;
+  font-size: 14px;
+  line-height: 1.6;
+  opacity: 0.85;
+}
+
+.spec-list li {
+  margin-bottom: 8px;
+}
+
+.flow-steps {
+  font-size: 13px;
+  line-height: 1.6;
+  opacity: 0.85;
+  padding-left: 18px;
+}
+
+.flow-steps li {
+  margin-bottom: 8px;
+}
+
+.panel-footer {
+  margin-top: auto;
+  font-size: 12px;
+  opacity: 0.5;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 20px;
+}
+
+/* Right/Center Panel - The Simulated Phone Area */
+.mobile-shell-wrapper {
+  flex: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  background-color: var(--bg-desktop);
+}
+
+@media (max-width: 1024px) {
+  .mobile-shell-wrapper {
+    padding: 10px;
+    background-color: var(--bg-app);
+  }
+}
+
+/* Simulated Smartphone Mockup Container */
+.smartphone-frame {
+  width: 390px;
+  height: 844px;
+  background-color: var(--bg-app);
+  border: 12px solid #281A14; /* Simulated dark phone edge */
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-smartphone);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  user-select: none;
+}
+
+@media (max-width: 480px) {
+  /* On real mobile viewports, go full-screen without simulated shell borders */
+  .smartphone-frame {
+    width: 100vw;
+    height: 100vh;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+  }
+}
+
+/* Notch/Island on Smartphone */
+.smartphone-notch {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 120px;
+  height: 30px;
+  background-color: #281A14;
+  border-bottom-left-radius: 18px;
+  border-bottom-right-radius: 18px;
+  z-index: 100;
+}
+
+/* Simulated Phone Status Bar */
+.smartphone-status-bar {
+  height: 44px;
+  padding: 0 28px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-main);
+  background-color: transparent;
+  z-index: 90;
+  padding-bottom: 6px;
+}
+
+.status-icons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.battery-icon {
+  width: 22px;
+  height: 11px;
+  border: 1.5px solid var(--color-text-main);
+  border-radius: 3px;
+  position: relative;
+  padding: 1px;
+}
+
+.battery-level {
+  width: 100%;
+  height: 100%;
+  background-color: var(--color-text-main);
+  border-radius: 1px;
+}
+
+.battery-icon::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  right: -3.5px;
+  width: 2px;
+  height: 4px;
+  background-color: var(--color-text-main);
+  border-top-right-radius: 1px;
+  border-bottom-right-radius: 1px;
+}
+
+/* Phone Bottom Safe Area Bar */
+.smartphone-home-bar {
+  height: 24px;
+  width: 100%;
+  background-color: transparent;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  z-index: 90;
+}
+
+.smartphone-home-bar::after {
+  content: '';
+  width: 120px;
+  height: 5px;
+  background-color: rgba(0, 0, 0, 0.15);
+  border-radius: 10px;
+}
+
+/* The actual viewport viewport that routes our React pages */
+.smartphone-screen {
+  flex: 1;
+  width: 100%;
+  height: calc(100% - 68px); /* minus status & home bar */
+  overflow: hidden;
+  position: relative;
+  background-color: var(--bg-app);
+}
+
+/* Smooth Fade/Slide Page Transition animation wrapper */
+.page-transition {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  animation: pageFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes pageFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
