@@ -1,97 +1,114 @@
-import React, { useRef } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useYumpick } from '../YumpickContext';
 
 function Gallery() {
   const navigate = useNavigate();
-  const { presets, handlePhotoSelect, setCurrentImage, setDetectedIngredients } = useYumpick();
-  const fileInputRef = useRef(null);
+  const { presets, handlePhotoSelect } = useYumpick();
+  const [selectedPresetIndex, setSelectedPresetIndex] = useState(0);
 
-  const onSelectPreset = (preset) => {
-    handlePhotoSelect(preset.url, preset.ingredients);
+  const handleSelectImage = (preset, idx) => {
+    setSelectedPresetIndex(idx);
+  };
+
+  const handleConfirmSelection = () => {
+    // Select the currently chosen preset image and navigate
+    const selectedPreset = presets[selectedPresetIndex] || presets[0];
+    if (selectedPreset) {
+      handlePhotoSelect(selectedPreset.url, selectedPreset.ingredients);
+    } else {
+      // fallback
+      handlePhotoSelect('', ['양파', '당근', '감자', '대파', '달걀', '돼지고기']);
+    }
     navigate('/detection');
   };
 
-  const handleCustomUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setCurrentImage(event.target.result);
-        // Set some dummy detected ingredients for the uploaded photo
-        setDetectedIngredients(['삼겹살', '김치', '두부', '파', '마늘']);
-        navigate('/detection');
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   return (
-    <div className="gallery-container page-transition">
-      {/* Top Header */}
-      <div className="page-header">
-        <button className="btn-back" onClick={() => navigate('/camera')}>
-          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <polyline points="15 18 9 12 15 6" />
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 22px 12px', flexShrink: 0 }}>
+        <button 
+          onClick={() => navigate('/camera')} 
+          style={{ 
+            width: '38px', 
+            height: '38px', 
+            borderRadius: '12px', 
+            background: '#FFFFFF', 
+            border: '1px solid #ECE0CD', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            cursor: 'pointer' 
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3A2A1E" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M15 18l-6-6 6-6"></path>
           </svg>
         </button>
-        <h2 className="page-title">내 앨범에서 선택</h2>
-        <div style={{ width: 24 }}></div> {/* spacer */}
+        <span style={{ font: "700 18px 'Pretendard'", color: '#3A2A1E' }}>앨범에서 선택</span>
       </div>
 
-      <div className="scrollable-content">
-        <p className="section-intro">
-          냉장고 재료가 잘 보이는 사진을 골라주세요. 분석을 통해 추천 요리를 매칭합니다.
-        </p>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '2px 26px 14px', flexShrink: 0 }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: '6px', font: "700 15px 'Pretendard'", color: '#3A2A1E' }}>
+          최근 항목
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5A3E2B" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6 9l6 6 6-6"></path>
+          </svg>
+        </span>
+        <span style={{ font: "600 13px 'Pretendard'", color: '#B7A595' }}>{presets.length}장</span>
+      </div>
 
-        {/* Upload Custom File Trigger */}
-        <div className="upload-box-wrapper">
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            onChange={handleCustomUpload} 
-            accept="image/*" 
-            style={{ display: 'none' }}
-          />
-          <button 
-            className="upload-custom-btn ripple" 
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginBottom: 8 }}>
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="17 8 12 3 7 8" />
-              <line x1="12" y1="3" x2="12" y2="15" />
-            </svg>
-            <span className="upload-title">새 사진 가져오기</span>
-            <span className="upload-desc">모바일 앨범 또는 파일 탐색기 열기</span>
-          </button>
-        </div>
-
-        <div className="gallery-divider">
-          <span>또는 추천 사진 템플릿 선택</span>
-        </div>
-
-        {/* Preset Photo Grid */}
-        <div className="presets-grid">
-          {presets.map((preset) => (
-            <div 
-              key={preset.id} 
-              className="preset-item-card ripple"
-              onClick={() => onSelectPreset(preset)}
-            >
-              <div className="preset-img-wrapper">
-                <img src={preset.url} alt={preset.title} className="preset-img" />
-                <div className="preset-overlay">
-                  <span className="preset-ingredients-count">재료 {preset.ingredients.length}개</span>
-                </div>
+      <div className="scrl" style={{ flex: 1, overflowY: 'auto', padding: '0 18px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '7px' }}>
+          {presets.map((preset, index) => {
+            const isSelected = selectedPresetIndex === index;
+            return (
+              <div 
+                key={preset.id} 
+                onClick={() => handleSelectImage(preset, index)} 
+                style={{ position: 'relative', cursor: 'pointer', aspectRatio: '1', borderRadius: '12px', overflow: 'hidden' }}
+              >
+                {preset.url ? (
+                  <img 
+                    src={preset.url} 
+                    alt={preset.title} 
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                  />
+                ) : (
+                  <div style={{ width: '100%', height: '100%', background: '#F3EADB', border: '1.5px dashed #D8C7AC' }}></div>
+                )}
+                {isSelected && (
+                  <>
+                    <div style={{ position: 'absolute', inset: 0, border: '3px solid #F4B740', borderRadius: '12px', pointerEvents: 'none' }}></div>
+                    <div style={{ position: 'absolute', top: '6px', right: '6px', width: '22px', height: '22px', borderRadius: '50%', background: '#F4B740', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.2)' }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#3A2A1E" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20 6L9 17l-5-5"></path>
+                      </svg>
+                    </div>
+                  </>
+                )}
               </div>
-              <div className="preset-info">
-                <h4 className="preset-title">{preset.title}</h4>
-                <p className="preset-tags">{preset.ingredients.join(', ')}</p>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
+      </div>
+
+      <div style={{ padding: '14px 24px 22px', flexShrink: 0 }}>
+        <button 
+          onClick={handleConfirmSelection} 
+          style={{ 
+            width: '100%', 
+            background: '#F4B740', 
+            color: '#3A2A1E', 
+            font: "700 16px 'Pretendard'", 
+            padding: '16px', 
+            borderRadius: '18px', 
+            border: 'none', 
+            cursor: 'pointer', 
+            boxShadow: '0 6px 16px rgba(244,183,64,0.4)' 
+          }}
+        >
+          이 사진 선택
+        </button>
       </div>
     </div>
   );

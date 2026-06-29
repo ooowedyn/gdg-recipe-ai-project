@@ -1,97 +1,70 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useYumpick } from '../YumpickContext';
 
 function Home() {
   const navigate = useNavigate();
-  const { selectedSeasonings, selectedTools, selectedAppliances } = useYumpick();
 
   return (
-    <div className="home-container page-transition">
-      {/* Brand Header */}
-      <div className="brand-logo-area">
-        <div className="app-logo">
-          <svg viewBox="0 0 100 100" width="80" height="80">
-            <defs>
-              <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#F8B62D" />
-                <stop offset="100%" stopColor="#D87E12" />
-              </linearGradient>
-            </defs>
-            <circle cx="50" cy="50" r="45" fill="url(#logoGrad)" />
-            {/* Cloche/Chef Cover Hat */}
-            <path d="M30,55 C30,35 70,35 70,55 Z" fill="#FFF" />
-            <rect x="26" y="56" width="48" height="6" rx="3" fill="#FFF" />
-            <circle cx="50" cy="33" r="5" fill="#FFF" />
-            {/* Fork/Spoon Detail */}
-            <path d="M42,67 L42,75 M58,67 L58,75" stroke="#FFF" strokeWidth="2.5" strokeLinecap="round" />
-            <path d="M42,75 C42,80 58,80 58,75" stroke="#FFF" strokeWidth="2.5" strokeLinecap="round" fill="none" />
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: '0 26px 30px' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '6px' }}>
+        <button 
+          onClick={() => navigate('/user-info')} 
+          style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '7px', 
+            background: '#FFFFFF', 
+            border: '1px solid #ECE0CD', 
+            borderRadius: '999px', 
+            padding: '8px 14px', 
+            font: "600 13px 'Pretendard'", 
+            color: '#6B5746', 
+            cursor: 'pointer' 
+          }}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6B5746" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            <circle cx="12" cy="7" r="4"></circle>
+          </svg>
+          내 정보
+        </button>
+      </div>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+        <div style={{ width: '98px', height: '98px', borderRadius: '30px', background: '#F4B740', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 12px 28px rgba(244,183,64,0.45)' }}>
+          <svg width="50" height="50" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 11h18a9 9 0 0 1-18 0z"></path>
+            <path d="M5 11a7 7 0 0 1 14 0"></path>
+            <path d="M9 5.5c0-1 1-1.2 1-2.5M13 5.5c0-1 1-1.2 1-2.5"></path>
           </svg>
         </div>
-        <h1 className="brand-name">Yumpick</h1>
-        <p className="brand-subtitle">냉장고 사진 한 장으로 만나는 맞춤 레시피</p>
+        <h1 style={{ fontFamily: "'Jua', sans-serif", fontSize: '44px', color: '#5A3E2B', margin: '24px 0 0', letterSpacing: '1px' }}>Yumpick</h1>
+        <p style={{ font: "500 15px 'Pretendard'", color: '#9A8678', margin: '12px 0 0', lineHeight: 1.55 }}>냉장고 속 재료를 찍으면<br />딱 맞는 메뉴를 추천해드려요</p>
       </div>
-
-      {/* Main Feature Cards */}
-      <div className="action-section">
-        <button 
-          className="btn btn-primary btn-large ripple"
-          onClick={() => navigate('/camera')}
-        >
-          <div className="btn-icon-wrapper">
-            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-              <circle cx="12" cy="13" r="4" />
-            </svg>
-          </div>
-          <div className="btn-text-content">
-            <span className="btn-title">냉장고 재료 촬영하기</span>
-            <span className="btn-desc">사진 촬영 & AI 재료 자동 인식</span>
-          </div>
-        </button>
-
-        <button 
-          className="btn btn-secondary ripple"
-          onClick={() => navigate('/user-info')}
-        >
-          <div className="btn-icon-wrapper-small">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-            </svg>
-          </div>
-          <span>내 요리 환경 설정하기</span>
-        </button>
-      </div>
-
-      {/* Info Status Board */}
-      <div className="status-board">
-        <h3 className="status-title">나의 주방 상태</h3>
-        <div className="status-grid">
-          <div className="status-item">
-            <span className="status-label">보유 양념</span>
-            <span className="status-value">{selectedSeasonings.length}종</span>
-          </div>
-          <div className="status-item">
-            <span className="status-label">조리 도구</span>
-            <span className="status-value">{selectedTools.length}개</span>
-          </div>
-          <div className="status-item">
-            <span className="status-label">보유 가전</span>
-            <span className="status-value">{selectedAppliances.length}개</span>
-          </div>
-        </div>
-        <p className="status-hint">설정된 양념과 도구에 맞는 레시피가 추천됩니다.</p>
-      </div>
-
-      {/* Quick Visual Decoration */}
-      <div className="deco-banner">
-        <span className="deco-emoji">🥬</span>
-        <span className="deco-emoji">🍅</span>
-        <span className="deco-emoji">🍳</span>
-        <span className="deco-emoji">🥩</span>
-        <span className="deco-emoji">🍜</span>
-      </div>
+      <button 
+        onClick={() => navigate('/camera')} 
+        style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          gap: '10px', 
+          background: '#F4B740', 
+          color: '#3A2A1E', 
+          font: "700 17px 'Pretendard'", 
+          padding: '18px', 
+          borderRadius: '20px', 
+          boxShadow: '0 8px 20px rgba(244,183,64,0.45)', 
+          border: 'none', 
+          width: '100%', 
+          cursor: 'pointer' 
+        }}
+      >
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3A2A1E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+          <circle cx="12" cy="13" r="4"></circle>
+        </svg>
+        재료 촬영하기
+      </button>
+      <p style={{ textAlign: 'center', font: "500 12.5px 'Pretendard'", color: '#B7A595', margin: '14px 0 0' }}>사진 한 장이면 충분해요</p>
     </div>
   );
 }

@@ -6,134 +6,126 @@ function Filter() {
   const navigate = useNavigate();
   const { filters, setFilters } = useYumpick();
 
-  // Helper to update specific filter keys
-  const updateFilter = (key, value) => {
+  const filterConfigs = [
+    { label: '난이도', opts: ['쉬움', '보통', '어려움'] },
+    { label: '조리시간', opts: ['15분 이내', '30분', '1시간+'] },
+    { label: '칼질 빈도', opts: ['적게', '보통', '많이'] },
+    { label: '설거지 양', opts: ['적게', '보통', '많이'] },
+    { label: '맵기', opts: ['순함', '보통', '매움'] },
+  ];
+
+  // Helper to ensure we have fallback defaults for these Korean keys
+  const getFilterValue = (label) => {
+    if (filters[label]) return filters[label];
+    
+    // Fallback defaults mapping
+    const defaults = {
+      '난이도': '쉬움',
+      '조리시간': '30분',
+      '칼질 빈도': '적게',
+      '설거지 양': '보통',
+      '맵기': '보통',
+    };
+    return defaults[label];
+  };
+
+  const handleSelectFilter = (label, val) => {
     setFilters({
       ...filters,
-      [key]: value
+      [label]: val
     });
   };
 
+  const getSegStyle = (isSelected) => {
+    return isSelected
+      ? {
+          flex: 1,
+          textAlign: 'center',
+          background: '#F4B740',
+          color: '#3A2A1E',
+          font: "600 13.5px 'Pretendard'",
+          padding: '10px 0',
+          borderRadius: '10px',
+          cursor: 'pointer'
+        }
+      : {
+          flex: 1,
+          textAlign: 'center',
+          color: '#9A8678',
+          font: "500 13.5px 'Pretendard'",
+          padding: '10px 0',
+          cursor: 'pointer'
+        };
+  };
+
   return (
-    <div className="filter-container page-transition">
-      {/* Top Header */}
-      <div className="page-header">
-        <button className="btn-back" onClick={() => navigate('/detection')}>
-          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <polyline points="15 18 9 12 15 6" />
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 22px 12px', flexShrink: 0 }}>
+        <button 
+          onClick={() => navigate('/detection')} 
+          style={{ 
+            width: '38px', 
+            height: '38px', 
+            borderRadius: '12px', 
+            background: '#FFFFFF', 
+            border: '1px solid #ECE0CD', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            cursor: 'pointer' 
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3A2A1E" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M15 18l-6-6 6-6"></path>
           </svg>
         </button>
-        <h2 className="page-title">필터 세부 설정</h2>
-        <div style={{ width: 24 }}></div>
+        <span style={{ font: "700 18px 'Pretendard'", color: '#3A2A1E' }}>조건 선택</span>
       </div>
 
-      <div className="scrollable-content">
-        <p className="section-intro">
-          재료 외에도 오늘의 요리 취향을 더 상세히 알려주세요. 딱 맞는 음식을 추천해 드립니다.
-        </p>
-
-        {/* 1. Difficulty Level Selector */}
-        <div className="filter-card">
-          <label className="filter-label">🍳 난이도</label>
-          <div className="segmented-control">
-            {['쉬움', '보통', '어려움'].map((level) => (
-              <button
-                key={level}
-                type="button"
-                className={`segment-btn ${filters.difficulty === level ? 'active' : ''}`}
-                onClick={() => updateFilter('difficulty', level)}
-              >
-                {level}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* 2. Cooking Time Limit */}
-        <div className="filter-card">
-          <div className="filter-card-header-row">
-            <label className="filter-label">⏱️ 최대 조리 시간</label>
-            <span className="slider-value-preview">{filters.time}분 이내</span>
-          </div>
-          <div className="slider-container">
-            <input
-              type="range"
-              min="15"
-              max="90"
-              step="15"
-              value={filters.time}
-              onChange={(e) => updateFilter('time', parseInt(e.target.value))}
-              className="custom-range-slider"
-            />
-            <div className="range-ticks">
-              <span>15분</span>
-              <span>30분</span>
-              <span>45분</span>
-              <span>60분</span>
-              <span>90분</span>
+      <div className="scrl" style={{ flex: 1, overflowY: 'auto', padding: '4px 24px 0', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <p style={{ font: "500 13.5px 'Pretendard'", color: '#9A8678', margin: 0, lineHeight: 1.55 }}>원하는 조건을 골라주세요</p>
+        
+        {filterConfigs.map(sec => {
+          const currentVal = getFilterValue(sec.label);
+          return (
+            <div key={sec.label}>
+              <h3 style={{ font: "700 14.5px 'Pretendard'", color: '#3A2A1E', margin: '0 0 10px' }}>{sec.label}</h3>
+              <div style={{ display: 'flex', background: '#FFFFFF', border: '1px solid #ECE0CD', borderRadius: '14px', padding: '4px', gap: '4px' }}>
+                {sec.opts.map(opt => {
+                  const isSelected = currentVal === opt;
+                  return (
+                    <span 
+                      key={opt}
+                      onClick={() => handleSelectFilter(sec.label, opt)} 
+                      style={getSegStyle(isSelected)}
+                    >
+                      {opt}
+                    </span>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        </div>
-
-        {/* 3. Cutting Frequency (칼질 빈도) */}
-        <div className="filter-card">
-          <label className="filter-label">🔪 칼질 빈도</label>
-          <div className="segmented-control">
-            {['낮음', '보통', '높음'].map((level) => (
-              <button
-                key={level}
-                type="button"
-                className={`segment-btn ${filters.cutting === level ? 'active' : ''}`}
-                onClick={() => updateFilter('cutting', level)}
-              >
-                {level}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* 4. Washing up load (설거지 양) */}
-        <div className="filter-card">
-          <label className="filter-label">🥣 설거지 양</label>
-          <div className="segmented-control">
-            {['적음', '보통', '많음'].map((level) => (
-              <button
-                key={level}
-                type="button"
-                className={`segment-btn ${filters.washing === level ? 'active' : ''}`}
-                onClick={() => updateFilter('washing', level)}
-              >
-                {level}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* 5. Spiciness Level (맵기 조절) */}
-        <div className="filter-card">
-          <label className="filter-label">🌶️ 맵기 정도</label>
-          <div className="segmented-control">
-            {['안 매움', '조금 매움', '매움'].map((level) => (
-              <button
-                key={level}
-                type="button"
-                className={`segment-btn ${filters.spiciness === level ? 'active' : ''}`}
-                onClick={() => updateFilter('spiciness', level)}
-              >
-                {level}
-              </button>
-            ))}
-          </div>
-        </div>
+          );
+        })}
+        <div style={{ height: '6px', flexShrink: 0 }}></div>
       </div>
 
-      {/* Sticky Bottom Actions */}
-      <div className="bottom-sticky-area">
+      <div style={{ padding: '14px 24px 22px', flexShrink: 0 }}>
         <button 
-          className="btn btn-primary btn-full ripple" 
-          onClick={() => navigate('/recommendation')}
+          onClick={() => navigate('/recommendation')} 
+          style={{ 
+            width: '100%', 
+            background: '#F4B740', 
+            color: '#3A2A1E', 
+            font: "700 16px 'Pretendard'", 
+            padding: '16px', 
+            borderRadius: '18px', 
+            border: 'none', 
+            cursor: 'pointer', 
+            boxShadow: '0 6px 16px rgba(244,183,64,0.4)' 
+          }}
         >
-          필터 확정 및 메뉴 보기
+          메뉴 추천받기
         </button>
       </div>
     </div>
