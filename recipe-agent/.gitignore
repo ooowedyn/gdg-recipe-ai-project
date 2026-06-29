@@ -1,0 +1,6 @@
+.env
+generated-gpt55-prompt.md
+__pycache__/
+*.exe
+*.tar.gz
+input-leap-extract/
