@@ -25,32 +25,35 @@ def save_b64_image(b64_data, file_path):
 
 
 def parse_ingredients(recipe):
-    """레시피 raw 데이터의 RCP_PARTS_DTLS 에서 재료 리스트를 추출한다."""
-    text = recipe.get("RCP_PARTS_DTLS", "")
-    ingredients = [
-        re.sub(r"\s+", " ", x).strip()
-        for x in re.split(r",|\n", text)
-        if x.strip()
-    ]
+    """recipe-agent 출력의 usedIngredients 와 seasonings 를 합쳐 재료 리스트를 만든다.
+
+    예: ["돼지고기 100g", "양파 1/2개(100g)", "간장 1큰술(15ml)", ...]
+    """
+    ingredients = []
+    for key in ("usedIngredients", "seasonings"):
+        for item in recipe.get(key, []) or []:
+            text = re.sub(r"\s+", " ", str(item)).strip()
+            if text:
+                ingredients.append(text)
     return ingredients
 
 
 def parse_steps(recipe):
-    """레시피 raw 데이터의 MANUAL01~20 에서 조리 단계 리스트를 추출한다.
+    """recipe-agent 출력의 steps(문자열 리스트)를 조리 단계 리스트로 변환한다.
+
+    각 원소는 "1단계: ...", "마지막 단계: ..." 형태의 문자열이며,
+    순서대로 stepNo 를 1부터 매긴다.
 
     반환 예:
-        [{"stepNo": 1, "originalText": "감자를 ...", "imageUrl": "http://..."}]
+        [{"stepNo": 1, "originalText": "1단계: 돼지고기를 ...", "imageUrl": None}]
     """
     steps = []
-    for i in range(1, 21):
-        num = str(i).zfill(2)
-        manual = recipe.get(f"MANUAL{num}", "").strip()
-        image = recipe.get(f"MANUAL_IMG{num}", "").strip()
-
-        if manual:
+    for i, raw in enumerate(recipe.get("steps", []) or [], start=1):
+        text = re.sub(r"\s+", " ", str(raw)).strip()
+        if text:
             steps.append({
                 "stepNo": i,
-                "originalText": re.sub(r"\s+", " ", manual),
-                "imageUrl": image if image else None,
+                "originalText": text,
+                "imageUrl": None,
             })
     return steps

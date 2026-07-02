@@ -42,12 +42,16 @@ STEP_SCHEMA = {
 }
 
 
-def build_step_prompt(menu_name, ingredients, steps, way="", category=""):
-    """단계 설명 + 단계/대표 이미지 프롬프트 생성을 위한 사용자 프롬프트를 만든다."""
+def build_step_prompt(menu_name, ingredients, steps, difficulty="", estimated_time="", reason=""):
+    """단계 설명 + 단계/대표 이미지 프롬프트 생성을 위한 사용자 프롬프트를 만든다.
+
+    recipe-agent 가 추천한 메뉴 정보를 입력으로 받는다.
+    """
     return f"""
 메뉴명: {menu_name}
-요리 종류: {category}
-조리 방법: {way}
+난이도: {difficulty}
+예상 시간: {estimated_time}
+추천 이유: {reason}
 전체 재료: {ingredients}
 조리 단계 목록: {steps}
 

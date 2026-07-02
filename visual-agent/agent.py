@@ -1,21 +1,35 @@
 """visual-agent
 
-선택된 레시피(식약처 raw 형식 dict)를 입력받아
+recipe-agent 가 추천한 메뉴(dict)를 입력받아
 초보자용 단계 설명(제목/설명/팁/주의)과 단계별·대표 음식 사진을 생성하고
 결과를 recipe_cards/{메뉴명}/ 폴더에 사진과 recipe.json 으로 저장하는 에이전트.
+
+입력 형식(recipe-agent 출력의 recipes 배열 원소 하나):
+    {
+      "name": "돼지고기양파덮밥",
+      "difficulty": "쉬움",
+      "estimatedTime": "준비 시간 10분 + 조리 시간 12분",
+      "servings": "1인분",
+      "usedIngredients": ["돼지고기 100g", ...],
+      "seasonings": ["간장 1큰술(15ml)", ...],
+      "reason": "...",
+      "steps": ["1단계: ...", "2단계: ...", "마지막 단계: ..."],
+      ...
+    }
 
 - 텍스트(단계 설명 + 이미지 프롬프트): gpt-5.4
 - 이미지 생성: gpt-image-2
 
-지금은 다른 에이전트가 줄 전체 레시피 대신 sample-input.json 의 예시 레시피를
-입력으로 사용한다. 입력 형식만 동일하면 그대로 교체해서 쓸 수 있다.
+sample-input.json 에는 recipe-agent 가 추천한 메뉴 한 개를 넣어 둔다.
+recipe-agent 출력 전체({"recipes": [...]})를 그대로 넣으면 첫 번째 메뉴를 사용한다.
 """
 
 import os
 import json
+import time
 from concurrent.futures import ThreadPoolExecutor
 
-from openai import OpenAI
+from openai import OpenAI, RateLimitError
 from dotenv import load_dotenv
 
 from prompt import STEP_SYSTEM_PROMPT, STEP_SCHEMA, build_step_prompt
@@ -33,7 +47,7 @@ load_dotenv()
 client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
 TEXT_MODEL = "gpt-5.4"
-IMAGE_MODEL = "gpt-image-2"
+IMAGE_MODEL = "gpt-image-1-mini"
 
 
 def request_json(system_prompt, prompt, schema, reasoning_effort="low"):
@@ -55,17 +69,29 @@ def request_json(system_prompt, prompt, schema, reasoning_effort="low"):
     return json.loads(response.output_text)
 
 
-def generate_image(prompt, file_path, size="1024x1024", quality="medium"):
-    """gpt-image-2 로 사진을 생성해 file_path 에 저장하고 경로를 반환한다."""
-    response = client.images.generate(
-        model=IMAGE_MODEL,
-        prompt=prompt,
-        size=size,
-        quality=quality,
-        output_format="png",
-        n=1,
-    )
-    return save_b64_image(response.data[0].b64_json, file_path)
+def generate_image(prompt, file_path, size="1024x1024", quality="low", max_retries=10):
+    """gpt-image-2 로 사진을 생성해 file_path 에 저장하고 경로를 반환한다.
+
+    이미지 API 는 분당 생성 한도(rate limit)가 낮아 여러 장을 동시에 요청하면
+    429 가 날 수 있다. 429 를 만나면 잠시 대기했다가 재시도한다.
+    """
+    for attempt in range(max_retries):
+        try:
+            response = client.images.generate(
+                model=IMAGE_MODEL,
+                prompt=prompt,
+                size=size,
+                quality=quality,
+                output_format="jpeg",
+                n=1,
+            )
+            return save_b64_image(response.data[0].b64_json, file_path)
+        except RateLimitError:
+            if attempt == max_retries - 1:
+                raise
+            wait = 15 * (attempt + 1)  # 한도가 분 단위로 리셋되므로 점진적으로 대기
+            print(f"이미지 rate limit → {wait}초 대기 후 재시도 ({attempt + 1}/{max_retries})")
+            time.sleep(wait)
 
 
 def generate_recipe_content(recipe, ingredients, steps):
@@ -76,11 +102,12 @@ def generate_recipe_content(recipe, ingredients, steps):
                tip, caution, imagePrompt}, ...]}
     """
     prompt = build_step_prompt(
-        menu_name=recipe.get("RCP_NM", ""),
+        menu_name=recipe.get("name", ""),
         ingredients=ingredients,
         steps=steps,
-        way=recipe.get("RCP_WAY2", ""),
-        category=recipe.get("RCP_PAT2", ""),
+        difficulty=recipe.get("difficulty", ""),
+        estimated_time=recipe.get("estimatedTime", ""),
+        reason=recipe.get("reason", ""),
     )
     result = request_json(STEP_SYSTEM_PROMPT, prompt, STEP_SCHEMA)
     print(f"단계 설명 {len(result['steps'])}개 + 이미지 프롬프트 생성 완료 !")
@@ -97,7 +124,7 @@ def run_visual_agent(recipe, output_dir=None, max_workers=8):
     if output_dir is None:
         output_dir = os.path.join(BASE_DIR, "recipe_cards")
 
-    menu_name = recipe.get("RCP_NM", "recipe")
+    menu_name = recipe.get("name", "recipe")
     ingredients = parse_ingredients(recipe)
     steps = parse_steps(recipe)
     print(f"재료 {len(ingredients)}개 / 조리 단계 {len(steps)}개 추출 완료 !")
@@ -108,10 +135,11 @@ def run_visual_agent(recipe, output_dir=None, max_workers=8):
     sorted_steps = sorted(content["steps"], key=lambda s: s.get("stepNo", 0))
 
     # 생성할 이미지 작업 목록: (키, 파일명, 프롬프트)
-    jobs = [("main", "main_food.png", content["mainImagePrompt"])]
+    # output_format="jpeg" 로 저장하므로 확장자도 .jpg 로 맞춘다.
+    jobs = [("main", "main_food.jpg", content["mainImagePrompt"])]
     for step in sorted_steps:
         step_no = step["stepNo"]
-        jobs.append((step_no, f"step_{str(step_no).zfill(2)}.png", step["imagePrompt"]))
+        jobs.append((step_no, f"step_{str(step_no).zfill(2)}.jpg", step["imagePrompt"]))
 
     def run_job(job):
         key, file_name, prompt = job
@@ -154,7 +182,13 @@ def run_visual_agent(recipe, output_dir=None, max_workers=8):
 
 if __name__ == "__main__":
     with open(os.path.join(BASE_DIR, "sample-input.json"), encoding="utf-8") as f:
-        recipe_input = json.load(f)
+        data = json.load(f)
+
+    # recipe-agent 출력 전체({"recipes": [...]})를 넣으면 첫 번째 메뉴를 사용한다.
+    if isinstance(data, dict) and "recipes" in data:
+        recipe_input = data["recipes"][0]
+    else:
+        recipe_input = data
 
     output = run_visual_agent(recipe_input)
     print(json.dumps(output, ensure_ascii=False, indent=2))

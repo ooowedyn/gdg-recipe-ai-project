@@ -12,7 +12,9 @@ sample-input.json / sample-output.json 만 사용하는 mock 모드로 동작한
 """
 
 import os
+import sys
 import json
+import importlib.util
 
 # 경로 기준: shared/ 의 부모 = 저장소 루트
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))   # .../shared
@@ -66,20 +68,22 @@ def run_pipeline(selected_index=0, ingredient_runner=None,
         "recipe", RECIPE_DIR, recipe_input, recipe_runner
     )
     recipes = recipe_output.get("recipes", [])
-    print(f"  출력: 추천 메뉴 {len(recipes)}개 -> {[r.get('title') for r in recipes]}")
+    print(f"  출력: 추천 메뉴 {len(recipes)}개 -> {[r.get('name') for r in recipes]}")
 
     # 3) 메뉴 선택: 앱에서는 사용자가 고른 메뉴 하나. 지금은 selected_index 로 선택.
-    selected = recipes[selected_index] if recipes else {}
-    print(f"\n선택된 메뉴: {selected.get('title')}")
+    if recipes and 0 <= selected_index < len(recipes):
+        selected = recipes[selected_index]
+    else:
+        selected = recipes[0] if recipes else {}
+    print(f"\n선택된 메뉴: {selected.get('name')}")
 
     # 4) 비주얼 에이전트: 선택된 메뉴 → 단계 설명 + 절차 사진
-    #    NOTE: 현재 visual-agent 는 식약처 raw 형식을 입력으로 받는다.
-    #          recipe(메뉴 제목) → raw(레시피 전문) 연결 방식이 확정되면
-    #          selected 를 raw 로 변환해 넘기면 된다. mock 모드에서는
-    #          visual-agent 의 sample-output.json 을 그대로 결과로 쓴다.
+    #    visual-agent 는 recipe-agent 출력의 메뉴 객체(name/steps/usedIngredients ...)를
+    #    그대로 입력으로 받으므로 selected 를 변환 없이 넘긴다.
+    #    mock 모드에서는 visual-agent 의 sample-output.json 을 결과로 쓴다.
     visual_input = selected
     print("\n[3/3] 비주얼 에이전트")
-    print("  입력 메뉴:", visual_input.get("title"))
+    print("  입력 메뉴:", visual_input.get("name"))
     visual_output = run_stage(
         "visual", VISUAL_DIR, visual_input, visual_runner
     )
@@ -91,28 +95,88 @@ def run_pipeline(selected_index=0, ingredient_runner=None,
     return visual_output
 
 
-if __name__ == "__main__":
-    # 기본: 전 구간 mock (sample 파일 기반). API 키 없이도 흐름 확인 가능.
-    result = run_pipeline()
+def _load_agent_module(agent_dir):
+    """agent.py 를 그 폴더의 prompt.py / utils.py 와 함께 격리해서 로드한다.
 
-    # 실제 에이전트로 바꾸려면 해당 단계의 run 함수를 import 해서 넘기면 된다.
-    # (각 에이전트 폴더의 agent.py 모듈명이 같으므로 importlib 로 개별 로드한다)
-    #
-    #   import importlib.util
-    #   def load_run(agent_dir, func):
-    #       import sys
-    #       sys.path.insert(0, agent_dir)
-    #       spec = importlib.util.spec_from_file_location(
-    #           "agent_" + os.path.basename(agent_dir).replace("-", "_"),
-    #           os.path.join(agent_dir, "agent.py"))
-    #       mod = importlib.util.module_from_spec(spec)
-    #       spec.loader.exec_module(mod)
-    #       return getattr(mod, func)
-    #
-    #   result = run_pipeline(
-    #       ingredient_runner=load_run(INGREDIENT_DIR, "run_ingredient_agent"),
-    #       visual_runner=load_run(VISUAL_DIR, "run_visual_agent"),
-    #   )
+    세 에이전트가 모두 최상위 이름 prompt / utils 를 import 하기 때문에,
+    한 프로세스에서 여러 개를 그냥 로드하면 sys.modules 캐시가 서로 충돌한다.
+    그래서 로드 직전에 그 캐시를 비우고 agent_dir 를 sys.path 맨 앞에 둬서
+    각 에이전트가 자기 폴더의 prompt / utils 를 import 하도록 만든다.
+    (import 시점에 이름이 바인딩되므로, 로드가 끝나면 캐시를 비워도 안전하다.)
+    """
+    for name in ("prompt", "utils"):
+        sys.modules.pop(name, None)
+
+    sys.path.insert(0, agent_dir)
+    try:
+        unique = "agent_" + os.path.basename(agent_dir).replace("-", "_")
+        spec = importlib.util.spec_from_file_location(
+            unique, os.path.join(agent_dir, "agent.py"))
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+    finally:
+        sys.path.remove(agent_dir)
+
+
+def build_real_runners():
+    """세 에이전트의 실제 run 함수를 로드해 (재료, 레시피, 비주얼) 러너로 반환한다.
+
+    OPENAI_API_KEY 가 필요하며, 각 에이전트 폴더의 .env 를 사용한다.
+    ingredient / visual 의 agent.py 는 import 시점에 OpenAI 클라이언트를
+    초기화하므로, 키가 없으면 여기서 에러가 난다.
+    """
+    ingredient_mod = _load_agent_module(INGREDIENT_DIR)
+    recipe_mod = _load_agent_module(RECIPE_DIR)
+    visual_mod = _load_agent_module(VISUAL_DIR)
+
+    def ingredient_runner(input_data):
+        data = dict(input_data)
+        # 이미지 상대 경로를 ingredient-agent 폴더 기준 절대 경로로 바꾼다.
+        image = data.get("imageFileName")
+        if image and not os.path.isabs(image):
+            data["imageFileName"] = os.path.join(INGREDIENT_DIR, image)
+        return ingredient_mod.run_ingredient_agent(data)
+
+    def recipe_runner(input_data):
+        # recipe-agent 는 단일 run 함수 대신 build_prompt + request_recipe 로 구성돼 있다.
+        if hasattr(recipe_mod, "run_recipe_agent"):
+            return recipe_mod.run_recipe_agent(input_data)
+        recipe_mod.load_dotenv(os.path.join(RECIPE_DIR, ".env"))
+        prompt = recipe_mod.build_prompt(input_data["ingredients"])
+        return recipe_mod.request_recipe(prompt, recipe_mod.DEFAULT_MODEL)
+
+    def visual_runner(selected):
+        # selected 는 recipe-agent 출력의 메뉴 객체이며 그대로 입력으로 받는다.
+        return visual_mod.run_visual_agent(selected)
+
+    return ingredient_runner, recipe_runner, visual_runner
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="에이전트 파이프라인 실행")
+    parser.add_argument(
+        "--real", action="store_true",
+        help="sample 파일 대신 실제 에이전트 run 함수로 실행 (OPENAI_API_KEY 필요)")
+    parser.add_argument(
+        "--select", type=int, default=0,
+        help="추천 메뉴 중 비주얼 단계로 넘길 메뉴 index (기본 0)")
+    args = parser.parse_args()
+
+    if args.real:
+        # 실제 에이전트로 전 구간 실행.
+        ingredient_runner, recipe_runner, visual_runner = build_real_runners()
+        result = run_pipeline(
+            selected_index=args.select,
+            ingredient_runner=ingredient_runner,
+            recipe_runner=recipe_runner,
+            visual_runner=visual_runner,
+        )
+    else:
+        # 기본: 전 구간 mock (sample 파일 기반). API 키 없이도 흐름 확인 가능.
+        result = run_pipeline(selected_index=args.select)
 
     print("\n=== 최종 결과 ===")
     print(json.dumps(result, ensure_ascii=False, indent=2))
