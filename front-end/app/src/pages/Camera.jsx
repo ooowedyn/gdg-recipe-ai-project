@@ -1,8 +1,21 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useYumpick } from '../YumpickContext';
 
 function Camera() {
   const navigate = useNavigate();
+  const { setCurrentImage, setImageFile, setDetectedIngredients } = useYumpick();
+  const fileInputRef = useRef(null);
+
+  // 셔터 버튼 -> 실제 카메라/파일 선택. 선택한 파일을 백엔드 인식용으로 저장.
+  const handleCapture = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    setImageFile(file);
+    setCurrentImage(URL.createObjectURL(file));
+    setDetectedIngredients([]); // 이전 결과 초기화 -> Detection 에서 새로 인식
+    navigate('/detection');
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#241C17' }}>
@@ -58,16 +71,24 @@ function Camera() {
         >
           앨범
         </button>
-        <button 
-          onClick={() => navigate('/detection')} 
-          style={{ 
-            width: '74px', 
-            height: '74px', 
-            borderRadius: '50%', 
-            background: '#FFFFFF', 
-            border: '4px solid rgba(255,255,255,0.35)', 
-            boxShadow: '0 0 0 2px #241C17 inset', 
-            cursor: 'pointer' 
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          onChange={handleCapture}
+          style={{ display: 'none' }}
+        />
+        <button
+          onClick={() => fileInputRef.current && fileInputRef.current.click()}
+          style={{
+            width: '74px',
+            height: '74px',
+            borderRadius: '50%',
+            background: '#FFFFFF',
+            border: '4px solid rgba(255,255,255,0.35)',
+            boxShadow: '0 0 0 2px #241C17 inset',
+            cursor: 'pointer'
           }}
         ></button>
         <button 

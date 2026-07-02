@@ -129,6 +129,7 @@ export const YumpickProvider = ({ children }) => {
 
   // 2. Camera & Gallery photo selection
   const [currentImage, setCurrentImage] = useState(null); // Base64 or ObjectURL or mock url
+  const [imageFile, setImageFile] = useState(null); // 백엔드 재료 인식에 보낼 실제 파일(File/Blob)
 
   // 3. Detected ingredients list (Detection.jsx)
   const [detectedIngredients, setDetectedIngredients] = useState([]);
@@ -160,13 +161,27 @@ export const YumpickProvider = ({ children }) => {
 
   // --- 백엔드 연동 (실패하면 mock 으로 폴백하므로 UI 는 안 깨진다) ---
   const [recsLoading, setRecsLoading] = useState(false);
+  const [detectLoading, setDetectLoading] = useState(false);
 
-  // 업로드한 실제 사진 -> 백엔드 재료 인식
+  // 업로드한 실제 사진 -> 백엔드 재료 인식.
+  // 실패하면 기존 재료(프리셋 fallback)를 유지해 UI 가 안 깨진다.
   const detectFromFile = async (file, description = '') => {
-    const ings = await api.detectIngredients(file, description);
-    setDetectedIngredients(ings);
-    return ings;
+    if (!file) return detectedIngredients;
+    setDetectLoading(true);
+    try {
+      const ings = await api.detectIngredients(file, description);
+      if (ings.length) setDetectedIngredients(ings);
+      return ings;
+    } catch (err) {
+      console.warn('detect API 실패 → 기존 재료 유지', err);
+      return detectedIngredients;
+    } finally {
+      setDetectLoading(false);
+    }
   };
+
+  // 선택한 카드 -> 백엔드 단계 시각화(설명 + /media 이미지)
+  const visualizeRecipe = (card) => api.visualizeRecipe(card);
 
   // 확정된 재료 + 필터 -> 백엔드 추천. 실패 시 mock.
   const fetchRecommendations = async () => {
@@ -193,6 +208,8 @@ export const YumpickProvider = ({ children }) => {
         setSelectedAppliances,
         currentImage,
         setCurrentImage,
+        imageFile,
+        setImageFile,
         detectedIngredients,
         setDetectedIngredients,
         filters,
@@ -205,6 +222,8 @@ export const YumpickProvider = ({ children }) => {
         shuffleRecommendations,
         handlePhotoSelect,
         detectFromFile,
+        detectLoading,
+        visualizeRecipe,
         fetchRecommendations,
         recsLoading
       }}

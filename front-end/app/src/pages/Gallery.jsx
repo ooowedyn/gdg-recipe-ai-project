@@ -4,21 +4,32 @@ import { useYumpick } from '../YumpickContext';
 
 function Gallery() {
   const navigate = useNavigate();
-  const { presets, handlePhotoSelect } = useYumpick();
+  const { presets, handlePhotoSelect, setImageFile } = useYumpick();
   const [selectedPresetIndex, setSelectedPresetIndex] = useState(0);
 
   const handleSelectImage = (preset, idx) => {
     setSelectedPresetIndex(idx);
   };
 
-  const handleConfirmSelection = () => {
+  const handleConfirmSelection = async () => {
     // Select the currently chosen preset image and navigate
     const selectedPreset = presets[selectedPresetIndex] || presets[0];
     if (selectedPreset) {
+      // 프리셋 재료를 fallback 으로 먼저 채워두고(인식 실패 시에도 화면 유지),
       handlePhotoSelect(selectedPreset.url, selectedPreset.ingredients);
+      // 원격 이미지를 File 로 변환해 실제 백엔드 인식에 사용한다.
+      try {
+        const res = await fetch(selectedPreset.url);
+        const blob = await res.blob();
+        setImageFile(new File([blob], 'preset.jpg', { type: blob.type || 'image/jpeg' }));
+      } catch (err) {
+        console.warn('프리셋 이미지 로드 실패 → 프리셋 재료 사용', err);
+        setImageFile(null);
+      }
     } else {
       // fallback
       handlePhotoSelect('', ['양파', '당근', '감자', '대파', '달걀', '돼지고기']);
+      setImageFile(null);
     }
     navigate('/detection');
   };

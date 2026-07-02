@@ -1,13 +1,28 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useYumpick } from '../YumpickContext';
 
 function Detection() {
   const navigate = useNavigate();
-  const { currentImage, detectedIngredients, setDetectedIngredients } = useYumpick();
-  
+  const {
+    currentImage,
+    imageFile,
+    detectedIngredients,
+    setDetectedIngredients,
+    detectFromFile,
+    detectLoading,
+  } = useYumpick();
+
   const [showInput, setShowInput] = useState(false);
   const [inputValue, setInputValue] = useState('');
+
+  // 진입 시 선택한 사진이 있으면 백엔드로 재료를 인식한다.
+  // (실패하면 detectFromFile 내부에서 기존/프리셋 재료를 유지)
+  useEffect(() => {
+    if (imageFile) detectFromFile(imageFile);
+    // imageFile 이 바뀔 때만 인식한다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imageFile]);
 
   const handleRemove = (item) => {
     setDetectedIngredients(detectedIngredients.filter(x => x !== item));
@@ -95,9 +110,11 @@ function Detection() {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
             <span style={{ font: "700 15px 'Pretendard'", color: '#3A2A1E' }}>
-              인식된 재료 <span style={{ color: '#E89A2E' }}>{detectedIngredients.length}</span>
+              인식된 재료 <span style={{ color: '#E89A2E' }}>{detectLoading ? '…' : detectedIngredients.length}</span>
             </span>
-            <span style={{ font: "500 12.5px 'Pretendard'", color: '#B7A595' }}>탭하여 삭제 · 추가 가능</span>
+            <span style={{ font: "500 12.5px 'Pretendard'", color: '#B7A595' }}>
+              {detectLoading ? '재료 인식 중…' : '탭하여 삭제 · 추가 가능'}
+            </span>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
             {detectedIngredients.map(item => (
