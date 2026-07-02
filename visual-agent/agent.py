@@ -47,7 +47,7 @@ load_dotenv()
 client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
 TEXT_MODEL = "gpt-5.4"
-IMAGE_MODEL = "gpt-image-1-mini"
+IMAGE_MODEL = "gpt-image-1-mini" # gpt-image-2
 
 
 def request_json(system_prompt, prompt, schema, reasoning_effort="low"):
