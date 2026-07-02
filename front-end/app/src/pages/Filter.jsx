@@ -4,7 +4,13 @@ import { useYumpick } from '../YumpickContext';
 
 function Filter() {
   const navigate = useNavigate();
-  const { filters, setFilters } = useYumpick();
+  const { filters, setFilters, fetchRecommendations } = useYumpick();
+
+  // 조건 확정 -> 이때만 추천을 요청하고 추천 화면으로 이동한다(task 5).
+  const handleRecommend = () => {
+    fetchRecommendations();
+    navigate('/recommendation');
+  };
 
   const filterConfigs = [
     { label: '난이도', opts: ['쉬움', '보통', '어려움'] },
@@ -111,11 +117,11 @@ function Filter() {
       </div>
 
       <div style={{ padding: '14px 24px 22px', flexShrink: 0 }}>
-        <button 
-          onClick={() => navigate('/recommendation')} 
-          style={{ 
-            width: '100%', 
-            background: '#F4B740', 
+        <button
+          onClick={handleRecommend}
+          style={{
+            width: '100%',
+            background: '#F4B740',
             color: '#3A2A1E', 
             font: "700 16px 'Pretendard'", 
             padding: '16px', 

@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext } from 'react';
+import React, { createContext, useState, useContext, useRef } from 'react';
 import * as api from './api';
 
 const YumpickContext = createContext();
@@ -152,16 +152,51 @@ export const YumpickProvider = ({ children }) => {
     setDetectedIngredients(ingredients || ['양파', '토마토', '달걀']);
   };
 
-  // Re-recommend trigger (randomize order of recommendation list for demo)
-  const [recommends, setRecommends] = useState(MOCK_RECIPES);
-  
-  const shuffleRecommendations = () => {
-    setRecommends([...MOCK_RECIPES].sort(() => Math.random() - 0.5));
-  };
+  // 추천 목록. 처음엔 비어 있고, 추천이 오면 채운다(가짜 메뉴를 먼저 보여주지 않는다).
+  const [recommends, setRecommends] = useState([]);
 
-  // --- 백엔드 연동 (실패하면 mock 으로 폴백하므로 UI 는 안 깨진다) ---
+  // --- 백엔드 연동 ---
   const [recsLoading, setRecsLoading] = useState(false);
   const [detectLoading, setDetectLoading] = useState(false);
+
+  // 시각화 결과 캐시: id -> Promise<visualization>.
+  // 같은 메뉴를 다시 열면 재요청하지 않는다(task 7). 실패하면 캐시를 비워 재시도 허용.
+  const visualCacheRef = useRef({});
+
+  const getVisualization = (card) => {
+    const key = card.id || card.name;
+    if (!visualCacheRef.current[key]) {
+      visualCacheRef.current[key] = api.visualizeRecipe(card).catch((err) => {
+        delete visualCacheRef.current[key];
+        throw err;
+      });
+    }
+    return visualCacheRef.current[key];
+  };
+
+  // 추천 3개의 단계 사진을 미리 생성 시작(백그라운드). 클릭 시 즉시 표시되도록.
+  const prewarmVisuals = (cards) => {
+    cards.forEach((card) => {
+      getVisualization(card).catch(() => {});
+    });
+  };
+
+  // 추천 카드의 대표 사진(main-image)을 받아 카드에 채운다(task 2).
+  const fetchMainImagesFor = (cards) =>
+    Promise.all(
+      cards.map(async (card) => {
+        try {
+          const img = await api.fetchMainImage(card);
+          if (img) {
+            setRecommends((prev) =>
+              prev.map((c) => (c.id === card.id ? { ...c, image: img } : c))
+            );
+          }
+        } catch (err) {
+          console.warn('main image 실패', card.name, err);
+        }
+      })
+    );
 
   // 업로드한 실제 사진 -> 백엔드 재료 인식.
   // 실패하면 기존 재료(프리셋 fallback)를 유지해 UI 가 안 깨진다.
@@ -180,20 +215,26 @@ export const YumpickProvider = ({ children }) => {
     }
   };
 
-  // 선택한 카드 -> 백엔드 단계 시각화(설명 + /media 이미지)
-  const visualizeRecipe = (card) => api.visualizeRecipe(card);
+  // 선택한 카드 -> 백엔드 단계 시각화(캐시 사용)
+  const visualizeRecipe = (card) => getVisualization(card);
 
-  // 확정된 재료 + 필터 -> 백엔드 추천. 실패 시 mock.
+  // 확정된 재료 + 필터 -> 백엔드 추천.
+  // Filter 에서 넘어올 때와 재추천 버튼에서만 호출한다(task 5).
   const fetchRecommendations = async () => {
     setRecsLoading(true);
+    visualCacheRef.current = {}; // 새 추천 → 이전 시각화 캐시 폐기
     try {
       const recs = await api.recommendRecipes(detectedIngredients, filters);
-      if (recs.length) setRecommends(recs);
-    } catch (err) {
-      console.warn('recommend API 실패 → mock 사용', err);
-      setRecommends(MOCK_RECIPES);
-    } finally {
+      setRecommends(recs);
       setRecsLoading(false);
+      // 대표 사진 먼저 채우고(task 2), 이어서 단계 사진 사전 생성(task 7).
+      fetchMainImagesFor(recs).then(() => prewarmVisuals(recs));
+      return recs;
+    } catch (err) {
+      console.warn('recommend API 실패', err);
+      setRecommends([]);
+      setRecsLoading(false);
+      return [];
     }
   };
 
@@ -217,13 +258,12 @@ export const YumpickProvider = ({ children }) => {
         selectedRecipeId,
         setSelectedRecipeId,
         presets: PRESET_GALLERY_IMAGES,
-        recipes: MOCK_RECIPES,
         recommendedRecipes: recommends,
-        shuffleRecommendations,
         handlePhotoSelect,
         detectFromFile,
         detectLoading,
         visualizeRecipe,
+        getVisualization,
         fetchRecommendations,
         recsLoading
       }}

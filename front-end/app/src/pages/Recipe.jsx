@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useYumpick } from '../YumpickContext';
+import Loading from '../components/Loading';
 
 function Recipe() {
   const navigate = useNavigate();
-  const { selectedRecipeId, recommendedRecipes, visualizeRecipe } = useYumpick();
+  const { selectedRecipeId, recommendedRecipes, getVisualization } = useYumpick();
 
   // 추천 목록에서 선택한 카드를 찾는다.
   const card =
@@ -12,7 +13,7 @@ function Recipe() {
     recommendedRecipes[0] ||
     null;
 
-  // 백엔드 단계 시각화(설명 + /media 이미지) 결과
+  // 백엔드 단계 시각화(설명 + /media 이미지) 결과. 캐시되어 있으면 즉시 온다(task 7).
   const [visual, setVisual] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
@@ -23,7 +24,7 @@ function Recipe() {
     setLoading(true);
     setError(false);
     setVisual(null);
-    visualizeRecipe(card)
+    getVisualization(card)
       .then((data) => { if (alive) setVisual(data); })
       .catch((err) => { console.warn('visualize 실패 → 원본 단계 표시', err); if (alive) setError(true); })
       .finally(() => { if (alive) setLoading(false); });
@@ -33,13 +34,25 @@ function Recipe() {
 
   const name = visual?.title || card?.name || '';
   const ingredients = visual?.ingredients?.length ? visual.ingredients : (card?.ingredients || []);
-  // 시각화 성공 시 상세 단계, 실패 시 카드의 원본 텍스트 단계로 폴백
-  const steps = visual?.steps?.length
-    ? visual.steps
-    : (card?.steps || []).map((desc, i) => ({ step: i + 1, title: `${i + 1}단계`, description: desc, image: null }));
+  // 시각화 성공 시 이미지 포함 단계, 아직이면 카드의 단계(제목/설명/팁/주의)를 사진 없이 먼저 보여준다.
+  const steps = visual?.steps?.length ? visual.steps : (card?.steps || []);
+
+  // 조리 사진 생성 대기 중 계속 바뀌는 진행 문구(task 4)
+  const STEP_MSGS = [
+    '조리 순서에 맞는 사진을 그리는 중이에요…',
+    '재료와 조리 장면을 스케치하는 중이에요…',
+    '색을 입히고 사진을 다듬는 중이에요…',
+  ];
+  const [msgIdx, setMsgIdx] = useState(0);
+  useEffect(() => {
+    if (!loading) return;
+    const id = setInterval(() => setMsgIdx((i) => (i + 1) % STEP_MSGS.length), 2600);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
 
   const chip = { background: '#FEEFC7', color: '#7A5230', font: "600 12px 'Pretendard'", padding: '6px 11px', borderRadius: '999px' };
-  const placeholder = { background: '#F3EADB', border: '1.5px dashed #D8C7AC', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#B7A595', font: "500 12px 'Pretendard'" };
+  const placeholder = { background: '#F3EADB', border: '1.5px dashed #D8C7AC', display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center', justifyContent: 'center', color: '#B7A595', font: "500 12px 'Pretendard'" };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -89,8 +102,13 @@ function Recipe() {
         <div style={{ width: '100%', height: '180px', borderRadius: '22px', flexShrink: 0, overflow: 'hidden', ...placeholder }}>
           {visual?.mainImage ? (
             <img src={visual.mainImage} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ) : loading ? (
+            <>
+              <div className="yp-spinner" />
+              <span>완성 사진 그리는 중…</span>
+            </>
           ) : (
-            loading ? '완성 사진 그리는 중…' : '완성 음식 사진'
+            '완성 음식 사진'
           )}
         </div>
 
@@ -125,12 +143,16 @@ function Recipe() {
         <div>
           <h3 style={{ font: "700 15px 'Pretendard'", color: '#3A2A1E', margin: '0 0 14px' }}>조리 순서</h3>
           {loading && (
-            <p style={{ font: "500 13px 'Pretendard'", color: '#B7A595', margin: '0 0 14px', lineHeight: 1.6 }}>
-              조리 과정을 그리는 중이에요… 이미지 생성은 수십 초 걸릴 수 있어요.
-            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '13px', background: '#FFF8E7', border: '1px solid #F3E4BF', borderRadius: '14px', padding: '15px 16px', margin: '0 0 16px' }}>
+              <div className="yp-spinner-sm" style={{ flexShrink: 0 }} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', minWidth: 0 }}>
+                <span className="yp-loading-msg" style={{ font: "700 14.5px 'Pretendard'", color: '#7A5230' }}>{STEP_MSGS[msgIdx]}</span>
+                <span style={{ font: "500 12px 'Pretendard'", color: '#B7A595' }}>사진 생성은 수십 초 걸릴 수 있어요</span>
+              </div>
+            </div>
           )}
           {error && (
-            <p style={{ font: "500 12.5px 'Pretendard'", color: '#C08A4A', margin: '0 0 14px' }}>
+            <p style={{ font: "600 13px 'Pretendard'", color: '#C08A4A', margin: '0 0 14px' }}>
               이미지 생성에 실패해 조리 설명만 표시합니다.
             </p>
           )}
@@ -146,8 +168,13 @@ function Recipe() {
                 <div style={{ width: '100%', height: '150px', borderRadius: '16px', overflow: 'hidden', ...placeholder }}>
                   {step.image ? (
                     <img src={step.image} alt={step.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : loading ? (
+                    <>
+                      <div className="yp-spinner-sm" />
+                      <span>단계 사진 그리는 중…</span>
+                    </>
                   ) : (
-                    loading ? '단계 사진 그리는 중…' : `${step.step}단계 사진`
+                    `${step.step}단계 사진`
                   )}
                 </div>
                 <p style={{ font: "500 13.5px 'Pretendard'", color: '#4A382C', lineHeight: 1.6, margin: 0 }}>{step.description}</p>
