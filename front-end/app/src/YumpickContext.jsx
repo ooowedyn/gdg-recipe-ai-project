@@ -1,4 +1,5 @@
 import React, { createContext, useState, useContext } from 'react';
+import * as api from './api';
 
 const YumpickContext = createContext();
 
@@ -157,6 +158,30 @@ export const YumpickProvider = ({ children }) => {
     setRecommends([...MOCK_RECIPES].sort(() => Math.random() - 0.5));
   };
 
+  // --- 백엔드 연동 (실패하면 mock 으로 폴백하므로 UI 는 안 깨진다) ---
+  const [recsLoading, setRecsLoading] = useState(false);
+
+  // 업로드한 실제 사진 -> 백엔드 재료 인식
+  const detectFromFile = async (file, description = '') => {
+    const ings = await api.detectIngredients(file, description);
+    setDetectedIngredients(ings);
+    return ings;
+  };
+
+  // 확정된 재료 + 필터 -> 백엔드 추천. 실패 시 mock.
+  const fetchRecommendations = async () => {
+    setRecsLoading(true);
+    try {
+      const recs = await api.recommendRecipes(detectedIngredients, filters);
+      if (recs.length) setRecommends(recs);
+    } catch (err) {
+      console.warn('recommend API 실패 → mock 사용', err);
+      setRecommends(MOCK_RECIPES);
+    } finally {
+      setRecsLoading(false);
+    }
+  };
+
   return (
     <YumpickContext.Provider
       value={{
@@ -178,7 +203,10 @@ export const YumpickProvider = ({ children }) => {
         recipes: MOCK_RECIPES,
         recommendedRecipes: recommends,
         shuffleRecommendations,
-        handlePhotoSelect
+        handlePhotoSelect,
+        detectFromFile,
+        fetchRecommendations,
+        recsLoading
       }}
     >
       {children}
