@@ -11,31 +11,37 @@ export const useYumpick = () => {
   return context;
 };
 
-// Preset gallery items (mock photos)
+// Preset gallery items — public/ 폴더의 로컬 이미지 (URL 은 '/파일명.png')
 const PRESET_GALLERY_IMAGES = [
   {
     id: 'gallery-1',
-    url: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.0.3',
-    ingredients: ['토마토', '달걀', '양파', '올리브유'],
-    title: '신선한 토마토와 계란'
+    url: '/전남친토스트.png',
+    ingredients: ['식빵', '크림치즈', '블루베리잼'],
+    title: '전남친 토스트 재료'
   },
   {
     id: 'gallery-2',
-    url: 'https://images.unsplash.com/photo-1566385278603-60576db70855?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.0.3',
-    ingredients: ['닭고기', '당근', '감자', '양파', '대파'],
-    title: '닭도리탕용 식재료 바구니'
+    url: '/닭볶음탕.png',
+    ingredients: ['닭고기', '감자', '당근', '양파', '대파'],
+    title: '닭볶음탕 재료'
   },
   {
     id: 'gallery-3',
-    url: 'https://images.unsplash.com/photo-1624462966581-bc6d768cbce5?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.0.3',
-    ingredients: ['삼겹살', '마늘', '양송이버섯', '쌈장'],
-    title: '고기구이 재료'
+    url: '/제육볶음.png',
+    ingredients: ['돼지고기', '양파', '대파', '고추장', '고춧가루', '다진마늘'],
+    title: '제육볶음 재료'
   },
   {
     id: 'gallery-4',
-    url: 'https://images.unsplash.com/photo-1551024709-8f23befc6f87?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.0.3',
-    ingredients: ['파스타면', '베이컨', '마늘', '올리브유', '치즈'],
-    title: '오일 파스타 식재료'
+    url: '/새우파전.png',
+    ingredients: ['새우', '대파', '부침가루', '달걀'],
+    title: '새우파전 재료'
+  },
+  {
+    id: 'gallery-5',
+    url: '/감자.png',
+    ingredients: ['감자', '양파', '당근', '대파'],
+    title: '감자 요리 재료'
   }
 ];
 

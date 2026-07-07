@@ -54,13 +54,15 @@ npm run build        # dist/ 생성 (백엔드가 이 dist 를 화면으로 서�
 | **빌드(같은 서버)** | 백엔드가 dist 를 서빙 → same-origin | 설정 불필요 |
 | **앱(Capacitor)** | 화면이 앱 내부에서 열려 상대경로 불가 → 절대주소 필요 | `.env` 의 `VITE_API_BASE` |
 
-`.env` 예시 (앱 빌드 시):
+`.env` 예시 (앱 빌드 시 — **Cloudflare 터널 주소**):
 ```
 # front-end/app/.env
-VITE_API_BASE=https://내-서버-터널주소   # 반드시 https:// 포함
+VITE_API_BASE=https://xxxx.trycloudflare.com   # 반드시 https:// 포함
 ```
-> `.env` 는 git 에 안 올라간다(무시됨). 팀원에게는 주소만 알려주면 된다. `.env.example` 참고.
-> API 키는 여기에 넣지 않는다 — 키는 백엔드에만 있다.
+> - 터널 주소는 백엔드에서 `cloudflared tunnel --url http://localhost:8000` 로 얻는다.
+> - ⚠️ **ngrok 무료는 쓰지 않는다** — 경고 페이지 때문에 조리 사진(`<img>`)이 깨진다. Cloudflare 는 정상.
+> - `.env` 는 git 에 안 올라간다(무시됨). 팀원에게는 주소만 알려주면 된다. `.env.example` 참고.
+> - API 키는 여기에 넣지 않는다 — 키는 백엔드에만 있다.
 
 ---
 
@@ -89,4 +91,5 @@ VITE_API_BASE=https://내-서버-터널주소   # 반드시 https:// 포함
 ## 6. 앱(Capacitor)으로 만들기
 
 `npm run build` 후 Capacitor로 Android 앱으로 포장한다(별도 팀 가이드 참고).
-앱은 상대경로를 못 쓰므로 **빌드 전에 `.env` 의 `VITE_API_BASE` 를 서버 절대주소로** 설정해야 한다.
+앱은 상대경로를 못 쓰므로 **빌드 전에 `.env` 의 `VITE_API_BASE` 를 Cloudflare 터널 주소로** 설정해야 한다.
+(ngrok 무료는 이미지가 깨지므로 Cloudflare 터널을 쓴다.)
