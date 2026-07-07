@@ -1,186 +1,148 @@
-# Yumpick — 실행 & 구현 가이드 (Frontend + Backend)
+# Yumpick 백엔드 (FastAPI)
 
-냉장고 속 재료 사진 한 장으로 **재료 인식 → 메뉴 추천 → 단계별 조리 사진**까지 만들어 주는 앱.
-프론트엔드(`front-end/app`, React + Vite)와 백엔드(`backend`, FastAPI)가 3개의 OpenAI 에이전트
-(`ingredient-agent` / `recipe-agent` / `visual-agent`)를 호출해 동작한다.
-
-```
-[사진]  ──►  ingredient-agent  ──►  [재료 목록]
-[재료+필터] ─►  recipe-agent     ──►  [추천 메뉴 3개]
-[선택 메뉴] ─►  visual-agent     ──►  [단계 설명 + 조리 사진(/media)]
-```
+냉장고 재료 사진 → **재료 인식 → 메뉴 추천(웹검색) → 단계별 조리 사진**을 만들어 주는 API 서버.
+프론트엔드(`front-end/app`)와 3개 에이전트(`ingredient-agent` / `recipe-agent` / `visual-agent`)를 잇는다.
 
 ---
 
-## 1. 빠른 실행 (터미널 2개)
+## 1. 진입점 & 실행
+
+**진입점: `app/main.py` 의 `app` 객체** → `uvicorn app.main:app` 로 실행한다.
 
 ```bash
-# 터미널 1 (백엔드)  → http://localhost:8000
-cd /mnt/d/gdg/backend && python3 -m uvicorn app.main:app --reload
-
-# 터미널 2 (프론트)  → http://localhost:5173
-cd /mnt/d/gdg/front-end/app && npm run dev
+cd /mnt/d/gdg/backend
+pip install -r requirements.txt          # 최초 1회
+python3 -m uvicorn app.main:app --reload  # 개발용 (http://localhost:8000)
 ```
 
-브라우저는 **`http://localhost:5173`** 로 접속한다.
-프론트의 `fetch('/api/...')` 는 Vite 프록시가 `:8000` 으로 넘겨주므로 CORS 신경 쓸 필요가 없다.
+- 다른 포트로 띄우려면: `--port 8010`
+- 폰/외부에서 접속(터널·앱)하려면: `--host 0.0.0.0 --port 8000`
 
-> **사전 준비**
-> - 프론트: **Node.js 20.19+ 또는 22.12+** 필요(Vite 8 요구). 최초 1회 `npm install`.
-> - 백엔드: `pip install -r requirements.txt`. 루트 `.env`에 `OPENAI_API_KEY`가 있으면 **실제 모드**, 없으면 자동 **mock 모드**.
+### 백엔드로 "화면까지" 보기 (진입 확인)
+프론트 빌드(`front-end/app/dist`)가 있으면 **이 서버 하나로 화면+API를 같이** 서빙한다.
+
+| 주소 | 내용 |
+|---|---|
+| `http://localhost:8000/` | 앱 화면 (dist 서빙) |
+| `http://localhost:8000/docs` | API 문서(Swagger) — 여기서 직접 호출 테스트 가능 |
+| `http://localhost:8000/health` | 상태 확인 → `{"status":"ok","mock":false}` |
+
+> `dist` 가 없으면 화면은 안 뜬다. `cd front-end/app && npm run build` 로 만들거나, 개발 땐 프론트를 따로 `npm run dev`(5173)로 띄운다.
 
 ---
 
-## 2. 진입점 (Entry Points)
+## 2. 💡 크레딧 없이 화면/흐름만 보기 (mock 모드)
 
-### 프론트엔드
-```
-index.html              # <div id="root"> + /src/main.jsx 로드
-└─ src/main.jsx         # React 앱을 #root 에 마운트 (실질적 코드 진입점)
-   └─ src/App.jsx       # BrowserRouter + 8개 화면 라우트 정의
-      └─ src/YumpickContext.jsx   # 전역 상태 + 백엔드 API 배선 (핵심 허브)
-         └─ src/api.js  # FastAPI 호출 클라이언트 (detect/recommend/visualize)
+`OPENAI_API_KEY` 가 없거나 크레딧이 떨어졌으면, **mock 모드**로 켜면 실제 AI 호출 없이 샘플 데이터로 전체 흐름을 볼 수 있다.
+
+```bash
+cd /mnt/d/gdg/backend
+USE_MOCK=true python3 -m uvicorn app.main:app --reload
 ```
 
-라우트 구성 (`App.jsx`):
-
-| 경로 | 화면 | 역할 |
-|---|---|---|
-| `/` | Home | 시작 |
-| `/user-info` | UserInfo | 보유 양념/도구/가전 설정 |
-| `/camera` | Camera | 촬영(=로컬 파일 열람) |
-| `/gallery` | Gallery | 앨범(프리셋) 선택 |
-| `/detection` | Detection | 인식된 재료 확인·수정 |
-| `/filter` | Filter | 난이도/시간/매움 등 필터 |
-| `/recommendation` | Recommendation | 추천 메뉴 목록 |
-| `/recipe` | Recipe | 선택 메뉴의 단계별 레시피+사진 |
-
-### 백엔드
-```
-uvicorn app.main:app        # 진입점
-└─ app/main.py              # FastAPI 인스턴스, CORS, 라우터 등록, /media 정적 서빙, (배포 시) SPA 서빙
-```
-
-- API 문서(Swagger): `http://localhost:8000/docs`
-- 헬스체크: `http://localhost:8000/health` → `{"status":"ok","mock":false}` (`mock` 값으로 현재 모드 확인)
+- `/health` 가 `{"mock":true}` 로 뜨면 mock 모드.
+- 각 에이전트의 `sample-output.json` 을 돌려주므로 **비용 0원**으로 화면·연결을 점검할 수 있다.
 
 ---
 
-## 3. 화면 흐름과 구현 로직 (단계별)
-
-전체 순서: **Home → (UserInfo) → Camera/Gallery → Detection → Filter → Recommendation → Recipe**
-
-### ① Camera — "촬영" 버튼 = 로컬 파일 열람
-- 중앙의 흰색 셔터 버튼을 누르면 실제 카메라 촬영이 아니라 **숨겨진 `<input type="file">`가 열려 로컬 파일을 선택**한다.
-  (`accept="image/*" capture="environment"` — 모바일에선 카메라, 데스크톱에선 파일 탐색기가 뜬다.)
-- 선택한 파일을 Context의 `imageFile`(실제 File 객체)과 `currentImage`(미리보기 URL)에 저장하고, 이전 인식 결과를 비운 뒤 `/detection`으로 이동한다.
-- 좌측 "앨범" 버튼은 `/gallery`로 간다.
-
-### ② Gallery — 프리셋 선택
-- 프리셋은 원격 이미지 URL이라, 그대로는 백엔드 multipart 전송이 안 된다. 그래서 "이 사진 선택" 시 **URL을 `fetch`→`Blob`→`File`로 변환**해 `imageFile`에 넣는다.
-- 동시에 프리셋에 정의된 재료를 **fallback**으로 미리 채워두어(`handlePhotoSelect`), 인식이 실패해도 화면이 비지 않는다.
-
-### ③ Detection — 자동 재료 인식
-- 진입 시 `imageFile`이 있으면 자동으로 **`POST /api/ingredients/detect`** (multipart: `image`, `description`)를 호출한다.
-- 인식 중에는 "재료 인식 중…" 로딩 표시. 성공하면 재료 칩이 백엔드 결과로 채워지고, 실패하면 기존/프리셋 재료를 유지한다.
-- 사용자는 칩을 탭해 삭제하거나 직접 추가할 수 있다. 여기서 확정된 재료가 다음 단계 입력이 된다.
-
-### ④ Filter — 조건 설정
-- 난이도/조리시간/칼질/설거지/매움 정도를 고른다. 값은 Context `filters`에 저장된다.
-- ⚠️ **현재 필터는 추천 프롬프트에 아직 반영되지 않는다**(아래 "알려진 한계" 참고). 카드 표시용 보조값으로만 쓰인다.
-
-### ⑤ Recommendation — 메뉴 추천
-- 진입 시 **`POST /api/recipes/recommend`** (`{ingredients, filters}`)를 호출해 메뉴 카드를 받아 렌더한다.
-- 상단 "재추천" 버튼은 같은 API를 다시 호출한다.
-- ⚠️ **API 응답 전/실패 시에는 검증용 mock 메뉴(토마토 달걀 볶음 등)가 먼저 보인다.** Context의 초기 상태가 mock 목록으로 세팅돼 있기 때문이며, 추천이 도착하면 실제 메뉴로 교체된다.
-
-### ⑥ Recipe — 단계별 레시피 + 사진
-- 선택한 카드로 **`POST /api/recipes/visualize`** 를 호출해 단계 설명과 조리 사진을 받는다.
-- 대표 사진과 각 단계 사진은 `/media/{메뉴}/*.png` URL로 오고, `<img>`로 렌더한다.
-- ⚠️ **이미지 생성이 오래 걸린다**(수십 초~수 분). 그동안 "그리는 중…" 표시가 나오고, 완료되면 사진이 채워진다. 끝내 실패하면 **텍스트 조리 설명만** 표시된다(아래 참고).
-
----
-
-## 4. 백엔드 아키텍처
+## 3. 폴더 구조
 
 ```
 backend/app/
-├─ main.py            # FastAPI 앱: CORS, 라우터 등록, /media 정적 서빙, (dist 있으면) SPA 서빙
+├─ main.py            # FastAPI 앱: CORS, 라우터 등록, /media 정적 서빙, (dist 있으면) 화면 서빙
 ├─ config.py          # 루트 .env 로딩, 경로/모델/USE_MOCK/CORS 설정
-├─ schemas.py         # Pydantic 요청/응답 모델 = 프론트-백 계약서
-├─ services.py        # 비즈니스 로직: 에이전트 호출 + 프론트 카드 형식 변환 (mock/real 분기)
+├─ schemas.py         # Pydantic 요청/응답 모델 (= 프론트-백 계약서)
+├─ services.py        # 비즈니스 로직: 에이전트 호출 + 카드 변환 + 캐시 (mock/real 분기)
 ├─ agents_loader.py   # 기존 3개 agent.py 를 한 프로세스에서 격리 로드
 └─ routers/
    ├─ ingredients.py  # POST /api/ingredients/detect
    ├─ recipes.py      # POST /api/recipes/recommend
-   └─ visuals.py      # POST /api/recipes/visualize
+   └─ visuals.py      # POST /api/recipes/visualize, /api/recipes/main-image
 ```
-
-### 핵심 동작
-- **mock / real 분기** (`config.py`): 루트 `.env`의 `OPENAI_API_KEY`가 없으면 `USE_MOCK=true`가 되어 각 에이전트의 `sample-output.json`을 반환한다. 키가 있으면 실제 에이전트를 호출한다. `USE_MOCK=false/true`로 강제 지정도 가능.
-- **agents_loader**: 세 에이전트가 모두 최상위 이름 `prompt`/`utils`를 import 해서 충돌한다. 로드 직전에 해당 캐시를 비우고 각 에이전트 폴더를 `sys.path` 앞에 두어 격리한다. (모듈은 최초 1회만 로드 후 캐시)
-- **services 변환 규칙**:
-  - `detect_ingredients` → `run_ingredient_agent`(gpt-5.4 비전) → 재료 문자열 배열
-  - `recommend_recipes` → `build_prompt`+`request_recipe`(recipe-agent, Responses API) → `_to_card`로 프론트 카드 변환(`estimatedTime`→분 파싱, `usedIngredients+seasonings` 합침, `image`는 아직 없음)
-  - `visualize` → `run_visual_agent`(gpt-5.4 텍스트 + **gpt-image-2** 이미지) → `_with_media_urls`로 파일명을 `/media/{메뉴}/*.png` URL로 치환
-- **이미지 rate-limit 대응** (중요): 이미지 API는 분당 생성 한도(예: 5장)가 낮다. 메뉴 하나에 대표 1장 + 단계 N장을 만들다 보니 429가 쉽게 난다. 이를 위해:
-  - `visual-agent/agent.py`의 `generate_image`에 **429 재시도/백오프**(15초씩 증가) 추가
-  - `services.visualize`에서 **동시성을 낮추고**(`max_workers=2`), 끝내 실패하면 500 대신 **카드의 원본 단계 텍스트로 폴백**(사진 없이 설명만)
 
 ---
 
-## 5. 엔드포인트
+## 4. 엔드포인트
 
 | 메서드 | 경로 | 화면 | 입력 → 출력 |
 |---|---|---|---|
-| POST | `/api/ingredients/detect` | Camera/Gallery → Detection | 이미지(multipart `image`,`description`) → `{ingredients:[...]}` |
+| POST | `/api/ingredients/detect` | Camera/Gallery → Detection | 이미지(multipart) → `{ingredients:[...]}` |
 | POST | `/api/recipes/recommend` | Filter → Recommendation | `{ingredients, filters}` → `{recipes:[카드...]}` |
+| POST | `/api/recipes/main-image` | Recommendation(카드 썸네일) | `{name, ingredients}` → `{image:"/media/..."}` |
 | POST | `/api/recipes/visualize` | Recipe | `{name, ingredients, steps, difficulty}` → `{title, mainImage, steps[]}` |
-| GET | `/media/{메뉴}/{파일}.png` | - | 생성된 조리 사진 (정적) |
+| GET | `/media/{메뉴}/{파일}.jpg` | - | 생성된 조리 사진(정적) |
 | GET | `/health` | - | `{"status":"ok","mock":bool}` |
 
-응답 카드/스텝 형식은 `schemas.py`(`RecipeCard`, `VisualizeResponse`)가 계약서다.
-프론트 `api.js`의 `adaptCard`가 카드에 없는 필드(매움/칼질 등)를 필터값으로 채우고, 이미지가 없으면 기본 이미지로 대체한다.
+---
+
+## 5. 핵심 로직
+
+### 파이프라인
+```
+[사진]  → ingredient-agent(gpt-5.4 vision) → [재료 목록]
+[재료]  → recipe-agent(웹검색 + gpt-5.5)   → [실제 메뉴 3개 + 단계(제목/설명/팁/주의)]
+[선택]  → visual-agent(gpt-image-1-mini)   → [대표 사진 + 단계 사진]  → /media 로 서빙
+```
+
+- **recipe-agent (웹검색 추천)**: `web_search` 도구로 인터넷의 실제 레시피(유행 메뉴 포함, 예: "전남친 토스트")를 검색해 추천한다. 각 단계에 제목·설명·**팁·주의**를 함께 작성한다.
+- **visual-agent (그림 전용)**: 레시피 텍스트를 재가공하지 않고 **이미지만** 생성한다. 이미지 프롬프트는 기계적으로 조립(추가 LLM 호출 없음). `jpeg/low/1024` 로 빠르게 뽑고, 이미지 API 분당 한도(429)에는 재시도로 대응.
+- **캐시/재사용 (`services._find_similar_cached`)**: 같은/비슷한 메뉴를 이미 만들었으면 재생성하지 않고 불러온다. **"요리 유형(토스트/볶음/조림…)이 같고 + 재료 유사도(Jaccard)가 충분히 높을 때만"** 재사용해, 이름만 같고 재료가 다른 엉뚱한 사진이 붙는 걸 막는다.
+- **대표 사진 먼저 (`main-image`)**: 추천 카드 썸네일용으로 대표 사진 한 장만 빠르게 생성/조회한다.
+- **폴백**: 이미지 생성이 끝내 실패해도 500 대신 텍스트 단계라도 돌려준다.
 
 ---
 
 ## 6. 환경설정 (.env)
 
-`.env`는 **저장소 루트(`/mnt/d/gdg/.env`)** 에 둔다. `config.py`가 여기서 읽으므로 backend 폴더에 별도 `.env`는 불필요.
+`.env` 는 **저장소 루트(`/mnt/d/gdg/.env`)** 에 둔다. `config.py` 가 여기서 읽는다.
 
 | 키 | 용도 |
 |---|---|
 | `OPENAI_API_KEY` | 3개 에이전트 공통 (없으면 자동 mock) |
 | `OPENAI_MODEL` | recipe-agent 모델 (기본 `gpt-5.5`) |
-| `USE_MOCK` | `true/false`로 모드 강제 |
-| `CORS_ORIGINS` | 허용 오리진 (기본 `http://localhost:5173,http://localhost:3000`) |
-| `GEMINI_API_KEY`, `FOOD_API_KEY` | (예약) |
+| `USE_MOCK` | `true` 면 크레딧 없이 샘플로 동작 |
+| `CORS_ORIGINS` | 허용 오리진(기본에 Vite·Capacitor 앱 오리진 포함) |
+
+> 🔐 **API 키는 서버(.env)에만** 둔다. 앱/프론트에는 절대 넣지 않는다. 프론트가 부를 서버 주소만 `front-end/app/.env` 의 `VITE_API_BASE` 로 설정한다.
 
 ---
 
-## 7. 알려진 한계 / TODO
+## 7. 문제 해결 (자주 나는 것)
 
-현재는 데모/해커톤 단계라 다음 제약이 있다.
+**① `[Errno 98] address already in use` / 포트가 이미 사용 중**
+이전 서버가 안 꺼진 것. 8000을 쓰는 프로세스를 종료하거나 다른 포트로 켠다.
+```bash
+kill -9 $(lsof -t -i:8000)      # 8000 점유 프로세스 종료
+# 또는 그냥 다른 포트로:
+python3 -m uvicorn app.main:app --reload --port 8010
+```
 
-- **카메라 = 로컬 파일 선택**: 실시간 카메라 프리뷰/촬영이 아니라 파일 열람 창으로 대체돼 있다. (모바일에선 카메라가 뜨지만 앱 내 프리뷰 UI는 목업)
-- **초기 화면에 무관한 메뉴가 먼저 보임**: 추천 API 응답 전(또는 실패 시) 검증용 mock 메뉴가 잠깐 표시된다. 실제 추천이 오면 교체된다.
-- **DB 없음 → 이력/저장 불가**: 상태가 브라우저 메모리(React Context)에만 있다. **이전에 만든 메뉴를 불러올 수 없고**, 새로고침하면 재료·추천·레시피가 모두 초기화된다. (추후 DB + 사용자별 히스토리 필요)
-- **사진 생성이 느림**: 이미지 API 분당 한도 때문에 단계가 많은 메뉴는 재시도 대기로 수 분까지 걸릴 수 있다. 한도를 상향하면 크게 빨라진다. 배포 시에는 **동기 응답 대신 작업 등록 + 상태 폴링**(예: `GET /api/jobs/{id}`)으로 분리 권장.
-- **필터 미반영**: 난이도/시간/매움 필터가 아직 recipe-agent 프롬프트에 전달되지 않는다. (`services._recipe_raw`에서 `build_prompt`에 조건 추가 필요)
-- **생성 이미지 저장 위치**: `visual-agent/recipe_cards/`에 로컬 저장 후 `/media`로 서빙. 다중 인스턴스 배포 시 공용 스토리지(S3 등)로 이전 필요.
+**② `429 insufficient_quota` (AI 호출이 500으로 실패)**
+OpenAI **크레딧 소진**이다. 코드 문제가 아니다.
+→ https://platform.openai.com/settings/organization/billing 에서 크레딧 충전.
+→ 급하면 위 2번 **mock 모드**로 화면만 확인.
+
+**③ 화면(`/`)이 안 뜸**
+`front-end/app/dist` 가 없어서다. `cd front-end/app && npm run build` 하거나 프론트를 `npm run dev` 로 따로 띄운다.
+
+**④ 사진 생성이 느림**
+정상. 이미지 API 분당 한도 때문에 재시도 대기가 생길 수 있다(한도 상향 시 빨라짐). 캐시 덕에 같은 메뉴 재요청은 즉시.
 
 ---
 
-## 8. 배포 메모 (단일 서버, B안)
+## 8. 배포 / 앱 (Cloudflare 터널)
 
-프론트를 빌드하면 FastAPI 하나가 화면까지 서빙한다(진입점 1개).
+내 컴퓨터를 서버로 쓸 땐 `--host 0.0.0.0` 로 켠 뒤 **Cloudflare 터널**로 공개 https 주소를 만들어 앱이 그 주소를 호출한다.
 
 ```bash
-cd front-end/app && npm install && npm run build   # → front-end/app/dist 생성
-cd ../../backend && python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+# 서버 (외부 접속 허용)
+python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+# 다른 터미널: 터널 → https 주소가 뜬다
+cloudflared tunnel --url http://localhost:8000
 ```
 
-- `dist`가 있으면 `main.py`가 감지해 `/`에서 화면을, `/api`·`/media`에서 API를 함께 서빙한다.
-- `dist`가 없으면(개발 중) 이 블록은 자동으로 건너뛴다 → 위 "빠른 실행"의 2-터미널 방식 사용.
-- 프로덕션은 `gunicorn + uvicorn worker` 권장.
-```
+> ⚠️ **ngrok 무료는 쓰지 않는다.** 경고 페이지 때문에 `<img>` 로 불러오는 조리 사진이 깨진다.
+> Cloudflare 터널은 경고 페이지가 없어 이미지가 정상 로드된다.
+
+- 프론트를 Android 앱으로 포장하는 절차(Capacitor)는 별도 가이드 참고.
+- 앱은 상대경로를 못 쓰므로 `front-end/app/.env` 의 `VITE_API_BASE` 에 위 터널 주소를 넣고 빌드해야 한다. (터널 주소가 바뀌면 다시 빌드)

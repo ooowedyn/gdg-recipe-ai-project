@@ -1,27 +1,22 @@
-"""visual-agent
+"""visual-agent — '그림만' 만든다.
 
-recipe-agent 가 추천한 메뉴(dict)를 입력받아
-초보자용 단계 설명(제목/설명/팁/주의)과 단계별·대표 음식 사진을 생성하고
-결과를 recipe_cards/{메뉴명}/ 폴더에 사진과 recipe.json 으로 저장하는 에이전트.
+recipe-agent 가 작성한 메뉴(dict)를 입력받아 대표 사진 1장과 단계별 사진 N장을
+생성하고, recipe_cards/{메뉴명}/ 폴더에 사진과 recipe.json 으로 저장한 뒤 결과 dict 를 반환한다.
 
-입력 형식(recipe-agent 출력의 recipes 배열 원소 하나):
+- 레시피 텍스트(단계 제목/설명/팁/주의)는 recipe-agent 가 이미 작성했으므로
+  여기서는 재가공하지 않고 그대로 통과시킨다.
+- 이미지 생성용 프롬프트는 prompt.py 에서 기계적으로 조립한다(추가 텍스트 LLM 호출 없음).
+- 이미지 생성: gpt-image-1-mini
+
+입력 형식(recipe-agent 출력의 recipes 배열 원소 하나 또는 서비스가 정규화한 dict):
     {
-      "name": "돼지고기양파덮밥",
-      "difficulty": "쉬움",
-      "estimatedTime": "준비 시간 10분 + 조리 시간 12분",
-      "servings": "1인분",
-      "usedIngredients": ["돼지고기 100g", ...],
-      "seasonings": ["간장 1큰술(15ml)", ...],
-      "reason": "...",
-      "steps": ["1단계: ...", "2단계: ...", "마지막 단계: ..."],
-      ...
+      "name": "...",
+      "ingredients": ["달걀 2개", ...],           # 없으면 usedIngredients+seasonings 로 대체
+      "steps": [
+        {"stepNo": 1, "title": "재료 손질", "description": "...", "tip": "...", "caution": "..."},
+        ...
+      ]
     }
-
-- 텍스트(단계 설명 + 이미지 프롬프트): gpt-5.4
-- 이미지 생성: gpt-image-2
-
-sample-input.json 에는 recipe-agent 가 추천한 메뉴 한 개를 넣어 둔다.
-recipe-agent 출력 전체({"recipes": [...]})를 그대로 넣으면 첫 번째 메뉴를 사용한다.
 """
 
 import os
@@ -32,13 +27,8 @@ from concurrent.futures import ThreadPoolExecutor
 from openai import OpenAI, RateLimitError
 from dotenv import load_dotenv
 
-from prompt import STEP_SYSTEM_PROMPT, STEP_SCHEMA, build_step_prompt
-from utils import (
-    ensure_recipe_dir,
-    save_b64_image,
-    parse_ingredients,
-    parse_steps,
-)
+from prompt import build_main_image_prompt, build_step_image_prompt
+from utils import ensure_recipe_dir, save_b64_image, parse_ingredients
 
 # 실행 위치와 상관없이 visual-agent 폴더를 기준으로 파일을 읽고 쓴다.
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -46,31 +36,11 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 load_dotenv()
 client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
-TEXT_MODEL = "gpt-5.4"
-IMAGE_MODEL = "gpt-image-1-mini" # gpt-image-2
-
-
-def request_json(system_prompt, prompt, schema, reasoning_effort="low"):
-    """gpt-5.4 에 프롬프트를 보내고 JSON Schema 형식 응답을 dict 로 받는다."""
-    response = client.responses.create(
-        model=TEXT_MODEL,
-        instructions=system_prompt,
-        input=prompt,
-        reasoning={"effort": reasoning_effort},
-        text={
-            "format": {
-                "type": "json_schema",
-                "name": "response_schema",
-                "strict": True,
-                "schema": schema,
-            }
-        },
-    )
-    return json.loads(response.output_text)
+IMAGE_MODEL = "gpt-image-1-mini"
 
 
 def generate_image(prompt, file_path, size="1024x1024", quality="low", max_retries=10):
-    """gpt-image-2 로 사진을 생성해 file_path 에 저장하고 경로를 반환한다.
+    """gpt-image-1-mini 로 사진을 생성해 file_path 에 저장하고 경로를 반환한다.
 
     이미지 API 는 분당 생성 한도(rate limit)가 낮아 여러 장을 동시에 요청하면
     429 가 날 수 있다. 429 를 만나면 잠시 대기했다가 재시도한다.
@@ -94,88 +64,96 @@ def generate_image(prompt, file_path, size="1024x1024", quality="low", max_retri
             time.sleep(wait)
 
 
-def generate_recipe_content(recipe, ingredients, steps):
-    """조리 단계를 초보자용 단계 설명으로 다듬고, 대표/단계별 이미지 프롬프트를 생성한다.
+def _normalize_steps(recipe):
+    """recipe-agent/서비스가 준 steps 를 {step,title,description,tip,caution} 로 정규화한다.
 
-    반환:
-        dict: {"mainImagePrompt": str, "steps": [{stepNo, title, description,
-               tip, caution, imagePrompt}, ...]}
+    step 은 객체({stepNo/step,title,...}) 또는 옛 형식의 문자열일 수 있다.
     """
-    prompt = build_step_prompt(
-        menu_name=recipe.get("name", ""),
-        ingredients=ingredients,
-        steps=steps,
-        difficulty=recipe.get("difficulty", ""),
-        estimated_time=recipe.get("estimatedTime", ""),
-        reason=recipe.get("reason", ""),
-    )
-    result = request_json(STEP_SYSTEM_PROMPT, prompt, STEP_SCHEMA)
-    print(f"단계 설명 {len(result['steps'])}개 + 이미지 프롬프트 생성 완료 !")
-    return result
+    normalized = []
+    for i, s in enumerate(recipe.get("steps", []) or []):
+        if isinstance(s, dict):
+            normalized.append({
+                "step": s.get("stepNo") or s.get("step") or (i + 1),
+                "title": s.get("title") or f"{i + 1}단계",
+                "description": s.get("description") or "",
+                "tip": s.get("tip") or "",
+                "caution": s.get("caution") or "",
+            })
+        else:  # 문자열 단계(구형)
+            normalized.append({
+                "step": i + 1,
+                "title": f"{i + 1}단계",
+                "description": str(s),
+                "tip": "",
+                "caution": "",
+            })
+    return normalized
 
 
-def run_visual_agent(recipe, output_dir=None, max_workers=8):
-    """레시피 raw dict 를 입력받아 단계 설명 + 사진(대표 1장, 단계별 N장)을 만들고
-    recipe_cards/{메뉴명}/ 에 사진과 recipe.json 을 저장한 뒤 결과 dict 를 반환한다.
+def run_visual_agent(recipe, output_dir=None, max_workers=2, main_only=False, force=False):
+    """레시피 dict 로 대표 사진(+단계 사진)을 만들고 결과 dict 를 반환한다.
 
-    이미지 생성(대표 1장 + 단계별 N장)은 ThreadPoolExecutor 로 동시에 요청해
-    전체 대기시간을 줄인다.
+    main_only=True 면 대표 사진 한 장만 만든다(추천 카드 썸네일용, task 2).
+    force=False 면 이미 존재하는 이미지는 재생성하지 않는다(사전 생성/캐시 재사용, task 7).
+    force=True 면 재료가 다른 낡은 이미지를 덮어쓰기 위해 무조건 새로 생성한다(task 8).
     """
     if output_dir is None:
         output_dir = os.path.join(BASE_DIR, "recipe_cards")
 
     menu_name = recipe.get("name", "recipe")
-    ingredients = parse_ingredients(recipe)
-    steps = parse_steps(recipe)
-    print(f"재료 {len(ingredients)}개 / 조리 단계 {len(steps)}개 추출 완료 !")
-
-    content = generate_recipe_content(recipe, ingredients, steps)
+    ingredients = recipe.get("ingredients") or parse_ingredients(recipe)
+    steps = _normalize_steps(recipe)
     recipe_dir = ensure_recipe_dir(menu_name, output_dir)
 
-    sorted_steps = sorted(content["steps"], key=lambda s: s.get("stepNo", 0))
-
     # 생성할 이미지 작업 목록: (키, 파일명, 프롬프트)
-    # output_format="jpeg" 로 저장하므로 확장자도 .jpg 로 맞춘다.
-    jobs = [("main", "main_food.jpg", content["mainImagePrompt"])]
-    for step in sorted_steps:
-        step_no = step["stepNo"]
-        jobs.append((step_no, f"step_{str(step_no).zfill(2)}.jpg", step["imagePrompt"]))
+    jobs = [("main", "main_food.jpg", build_main_image_prompt(menu_name, ingredients))]
+    if not main_only:
+        for s in steps:
+            jobs.append((
+                s["step"],
+                f"step_{str(s['step']).zfill(2)}.jpg",
+                build_step_image_prompt(menu_name, s["title"], s["description"]),
+            ))
 
     def run_job(job):
         key, file_name, prompt = job
-        generate_image(prompt, os.path.join(recipe_dir, file_name))
+        target = os.path.join(recipe_dir, file_name)
+        # 이미 있으면 재생성하지 않는다(사전 생성/캐시 재사용). force 면 덮어쓴다.
+        if not force and os.path.exists(target) and os.path.getsize(target) > 0:
+            print(f"{key} 사진 재사용")
+            return key, file_name
+        generate_image(prompt, target)
         print(f"{key} 사진 생성 완료 !")
         return key, file_name
 
-    # 모든 이미지를 동시에 생성
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         image_files = dict(executor.map(run_job, jobs))
 
-    main_image = image_files["main"]
-    output_steps = []
-    for step in sorted_steps:
-        step_no = step["stepNo"]
-        output_steps.append({
-            "step": step_no,
-            "title": step["title"],
-            "description": step["description"],
-            "tip": step["tip"],
-            "caution": step["caution"],
-            "image": image_files[step_no],
-        })
+    output_steps = [
+        {
+            "step": s["step"],
+            "title": s["title"],
+            "description": s["description"],
+            "tip": s["tip"],
+            "caution": s["caution"],
+            "image": image_files.get(s["step"]),
+        }
+        for s in steps
+    ]
 
     result = {
         "title": menu_name,
         "ingredients": ingredients,
-        "mainImage": main_image,
+        "mainImage": image_files["main"],
         "steps": output_steps,
     }
 
-    # 같은 폴더에 recipe.json 으로 저장
-    json_path = os.path.join(recipe_dir, "recipe.json")
-    with open(json_path, "w", encoding="utf-8") as f:
-        json.dump(result, f, ensure_ascii=False, indent=2)
-    print(f"결과 저장 완료 → {json_path}")
+    # main_only 사전 생성 단계에서는 recipe.json 을 덮어써 단계 정보를 잃지 않도록 저장하지 않는다.
+    if not main_only:
+        json_path = os.path.join(recipe_dir, "recipe.json")
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(result, f, ensure_ascii=False, indent=2)
+        print(f"결과 저장 완료 → {json_path}")
 
     return result
 

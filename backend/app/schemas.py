@@ -27,6 +27,15 @@ class RecommendRequest(BaseModel):
     filters: Optional[Filters] = None
 
 
+# 단계: recipe-agent 가 작성한 제목/설명/팁/주의 (visual-agent 는 이미지만 추가)
+class RecipeStep(BaseModel):
+    step: int
+    title: str = ""
+    description: str = ""
+    tip: str = ""
+    caution: str = ""
+
+
 class RecipeCard(BaseModel):
     id: str
     name: str
@@ -34,7 +43,7 @@ class RecipeCard(BaseModel):
     difficulty: Optional[str] = None
     ingredients: list[str] = []
     description: Optional[str] = None
-    steps: list[str] = []
+    steps: list[RecipeStep] = []
     image: Optional[str] = None
 
 
@@ -47,8 +56,18 @@ class RecommendResponse(BaseModel):
 class VisualizeRequest(BaseModel):
     name: str
     ingredients: list[str] = []
-    steps: list[str] = []
+    steps: list[RecipeStep] = []
     difficulty: Optional[str] = None
+
+
+# ---- 추천 카드 대표 사진만 생성 ----
+class MainImageRequest(BaseModel):
+    name: str
+    ingredients: list[str] = []
+
+
+class MainImageResponse(BaseModel):
+    image: Optional[str] = None
 
 
 class VisualStep(BaseModel):

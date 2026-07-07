@@ -47,11 +47,17 @@ class Settings:
     # 키가 없으면 mock 자동 활성화. USE_MOCK 으로 강제 지정도 가능.
     USE_MOCK = _as_bool(os.getenv("USE_MOCK", "")) or not OPENAI_API_KEY
 
-    # CORS 허용 오리진 (Vite 기본 5173)
+    # CORS 허용 오리진.
+    # - Vite 개발: http://localhost:5173
+    # - Capacitor 앱(WebView)의 화면 오리진: capacitor://localhost, http(s)://localhost
+    #   (앱은 서버 절대주소로 요청하지만, 브라우저/웹뷰가 검사하는 Origin 은 앱 화면 오리진이다)
     CORS_ORIGINS = [
         o.strip()
         for o in os.getenv(
-            "CORS_ORIGINS", "http://localhost:5173,http://localhost:3000"
+            "CORS_ORIGINS",
+            "http://localhost:5173,http://localhost:3000,"
+            "capacitor://localhost,ionic://localhost,"
+            "http://localhost,https://localhost",
         ).split(",")
         if o.strip()
     ]

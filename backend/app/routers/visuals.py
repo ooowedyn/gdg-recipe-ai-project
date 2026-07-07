@@ -6,7 +6,12 @@ NOTE: 실제 모드에서 이미지 생성은 수십 초가 걸릴 수 있다.
 
 from fastapi import APIRouter
 
-from ..schemas import VisualizeRequest, VisualizeResponse
+from ..schemas import (
+    VisualizeRequest,
+    VisualizeResponse,
+    MainImageRequest,
+    MainImageResponse,
+)
 from .. import services
 
 router = APIRouter(prefix="/api/recipes", tags=["visuals"])
@@ -15,3 +20,9 @@ router = APIRouter(prefix="/api/recipes", tags=["visuals"])
 @router.post("/visualize", response_model=VisualizeResponse)
 def visualize(req: VisualizeRequest):
     return services.visualize(req.model_dump())
+
+
+@router.post("/main-image", response_model=MainImageResponse)
+def main_image(req: MainImageRequest):
+    """추천 카드용 대표 사진 한 장만 생성/조회 (task 2)."""
+    return services.main_image(req.model_dump())

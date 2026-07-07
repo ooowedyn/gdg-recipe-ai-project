@@ -66,6 +66,8 @@ def request_recipe(prompt, model):
         "instructions": INSTRUCTIONS,
         "input": prompt,
         "reasoning": {"effort": "low"},
+        # 인터넷의 실제 레시피/유행 메뉴를 검색해 추천하도록 web_search 도구를 켠다.
+        "tools": [{"type": "web_search"}],
         "text": {
             "format": {
                 "type": "json_schema",
@@ -87,7 +89,7 @@ def request_recipe(prompt, model):
     )
 
     try:
-        with urllib.request.urlopen(request, timeout=90) as response:
+        with urllib.request.urlopen(request, timeout=180) as response:
             response_data = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         details = exc.read().decode("utf-8", errors="replace")
